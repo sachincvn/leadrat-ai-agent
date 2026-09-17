@@ -1,18 +1,34 @@
 """Leadrat CRM client - every method maps to one endpoint module."""
 
-from app.core.exceptions import LeadNotFoundError
-from app.integrations.crm.leadrat.endpoints import get_all_leads
+from app.core.exceptions import LeadNotFoundError, UserNotFoundError
+from app.core.jwt_claims import user_id as jwt_user_id
+from app.integrations.crm.leadrat.endpoints import (
+    get_all_leads,
+    get_all_users,
+    get_lead_history,
+    get_user_profile,
+)
 from app.integrations.crm.leadrat.endpoints.get_leads_custom_filters import get_leads_custom_filters
 from app.integrations.crm.leadrat.endpoints.get_leads_custom_filters_count import get_leads_custom_filters_count
 from app.integrations.crm.leadrat.endpoints.get_lead_active_counts import get_lead_active_counts
 from app.integrations.crm.leadrat.endpoints.get_lead_base_filter_counts import get_lead_base_filter_counts
 from app.integrations.crm.leadrat.endpoints.get_lead_status_counts import get_lead_status_counts
 from app.integrations.crm.leadrat.http import LeadratHttp
-from app.schemas.lead import Lead, LeadActiveCounts, LeadBaseFilterCounts, LeadFilters, LeadPage, LeadStatusCount
+from app.schemas.lead import (
+    Lead,
+    LeadActiveCounts,
+    LeadBaseFilterCounts,
+    LeadFilters,
+    LeadHistoryPage,
+    LeadPage,
+    LeadStatusCount,
+)
+from app.schemas.user import UserProfile, UserSummary
 
 
 class LeadratClient:
     def __init__(self, jwt: str, tenant: str):
+        self._jwt = jwt
         self._http = LeadratHttp(jwt, tenant)
 
     def get_lead(self, lead_id: str) -> Lead:
@@ -39,3 +55,22 @@ class LeadratClient:
 
     def get_lead_active_counts(self, filters: LeadFilters) -> LeadActiveCounts | None:
         return get_lead_active_counts(self._http, filters)
+
+    def get_lead_history(self, lead_id: str, limit: int = 20) -> LeadHistoryPage:
+        return get_lead_history(self._http, lead_id, page_size=limit)
+
+    def get_user_profile(self, user_id: str) -> UserProfile:
+        profile = get_user_profile(self._http, user_id)
+        if not profile.user_id:
+            raise UserNotFoundError(f"User '{user_id}' not found")
+        return profile
+
+    def get_my_profile(self) -> UserProfile:
+        # The caller's own id is embedded in their JWT - no lookup needed.
+        my_id = jwt_user_id(self._jwt) if self._jwt else None
+        if not my_id:
+            raise UserNotFoundError("Could not determine the caller's user id from their JWT")
+        return self.get_user_profile(my_id)
+
+    def list_users(self) -> list[UserSummary]:
+        return get_all_users(self._http)
