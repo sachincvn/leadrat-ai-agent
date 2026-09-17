@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # llm
     llm_provider: str = "ollama"  # ollama | huggingface | local_hf
     llm_temperature: float = 0.1
-    llm_max_tokens: int = 800
+    llm_max_tokens: int = 1500
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen3:8b"
     hf_api_token: str = ""

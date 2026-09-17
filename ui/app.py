@@ -55,6 +55,14 @@ with st.sidebar:
         st.error(f"Backend unreachable - {exc}")
 
     if st.button("Clear chat"):
+        # The backend remembers this conversation server-side (keyed off the
+        # caller's JWT) - clear it there too, or the next message would still
+        # pick up where the "forgotten" chat left off.
+        if jwt:
+            try:
+                api_client.clear_chat_history(jwt, tenant)
+            except Exception as exc:
+                st.error(f"Could not clear server-side memory - {exc}")
         st.session_state.messages = []
         st.rerun()
 
