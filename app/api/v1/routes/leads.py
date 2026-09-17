@@ -1,26 +1,34 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
-from app.api.deps import JWTToken
-from app.core.context import use_jwt
+from app.api.deps import CallerDep
+from app.core.context import use_caller
 from app.integrations.crm.factory import get_crm_client
-from app.schemas.lead import Lead, LeadFilters
+from app.schemas.lead import Lead, LeadFilters, LeadPage
 
 router = APIRouter(prefix="/leads", tags=["leads"])
 
 
-@router.get("/search", response_model=list[Lead])
+@router.get("/search", response_model=LeadPage)
 def search_leads(
-    jwt: JWTToken,
-    source: str | None = None,
+    caller: CallerDep,
+    keyword: str | None = None,
     location: str | None = None,
+    source: str | None = None,
     status: str | None = None,
-) -> list[Lead]:
-    with use_jwt(jwt):
-        filters = LeadFilters(source=source, location=location, status=status)
+    limit: int = Query(10, ge=1, le=500),
+) -> LeadPage:
+    with use_caller(caller.jwt, caller.tenant):
+        filters = LeadFilters(
+            keyword=keyword,
+            location=location,
+            source=source,
+            status=status,
+            limit=limit,
+        )
         return get_crm_client().search_leads(filters)
 
 
 @router.get("/{lead_id}", response_model=Lead)
-def get_lead(lead_id: str, jwt: JWTToken) -> Lead:
-    with use_jwt(jwt):
+def get_lead(lead_id: str, caller: CallerDep) -> Lead:
+    with use_caller(caller.jwt, caller.tenant):
         return get_crm_client().get_lead(lead_id)

@@ -5,28 +5,48 @@ import requests
 from ui.config import BASE, REQUEST_TIMEOUT
 
 
-def _headers(jwt: str | None) -> dict:
-    return {"Authorization": f"Bearer {jwt}"} if jwt else {}
+class ApiError(Exception):
+    """Carries the backend's own error message, not just the status code."""
+
+
+def _check(resp: requests.Response) -> dict | list:
+    if resp.status_code >= 400:
+        try:
+            detail = resp.json()["error"]["message"]
+        except Exception:
+            detail = resp.text[:300]
+        raise ApiError(f"{resp.status_code}: {detail}")
+    return resp.json()
+
+
+def _headers(jwt: str | None, tenant: str | None = None) -> dict:
+    headers = {}
+    if jwt:
+        headers["Authorization"] = f"Bearer {jwt}"
+    if tenant:
+        headers["tenant"] = tenant
+    return headers
 
 
 def health() -> dict:
-    resp = requests.get(f"{BASE}/health", timeout=10)
-    resp.raise_for_status()
-    return resp.json()
+    return _check(requests.get(f"{BASE}/health", timeout=10))
 
 
-def chat(message: str, jwt: str | None = None) -> dict:
+def chat(message: str, jwt: str | None = None, tenant: str | None = None) -> dict:
     resp = requests.post(
         f"{BASE}/chat",
         json={"message": message},
-        headers=_headers(jwt),
+        headers=_headers(jwt, tenant),
         timeout=REQUEST_TIMEOUT,
     )
-    resp.raise_for_status()
-    return resp.json()
+    return _check(resp)
 
 
-def get_lead(lead_id: str, jwt: str | None = None) -> dict:
-    resp = requests.get(f"{BASE}/leads/{lead_id}", headers=_headers(jwt), timeout=30)
-    resp.raise_for_status()
-    return resp.json()
+def search_leads(jwt: str, tenant: str, limit: int = 5) -> dict:
+    resp = requests.get(
+        f"{BASE}/leads/search",
+        params={"limit": limit},
+        headers=_headers(jwt, tenant),
+        timeout=REQUEST_TIMEOUT,
+    )
+    return _check(resp)

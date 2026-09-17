@@ -1,23 +1,50 @@
-"""Shared route dependencies."""
+"""Shared route dependencies: who is calling.
 
+Identity always comes from the request headers, never from configuration -
+the API is meant to be called straight from a frontend that holds the user's
+session, and the server keeps no credentials of its own.
+"""
+
+from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import Depends, Header
 
-from app.core.config import settings
 from app.core.exceptions import AuthError
+from app.core.jwt_claims import tenant_id
 
 
-def get_jwt_token(authorization: Annotated[str | None, Header()] = None) -> str:
-    """Leadrat JWT of the calling user, from `Authorization: Bearer <token>`.
+@dataclass(frozen=True)
+class Caller:
+    jwt: str
+    tenant: str
 
-    Falls back to LEADRAT_JWT in .env for local development.
+
+def get_caller(
+    authorization: Annotated[str | None, Header()] = None,
+    tenant: Annotated[str | None, Header()] = None,
+) -> Caller:
+    """Identity of the calling user.
+
+    Authorization: Bearer <leadrat-jwt>   required
+    tenant: <tenant-id>                   optional, defaults to the token's
+                                          custom:tenant_id claim
     """
-    if authorization and authorization.lower().startswith("bearer "):
-        return authorization.split(" ", 1)[1].strip()
-    if settings.leadrat_jwt:
-        return settings.leadrat_jwt
-    raise AuthError("Missing Leadrat JWT. Send 'Authorization: Bearer <token>'.")
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise AuthError("Missing Leadrat JWT. Send 'Authorization: Bearer <token>'.")
+
+    jwt = authorization.split(" ", 1)[1].strip()
+    if not jwt:
+        raise AuthError("Empty Leadrat JWT in the Authorization header.")
+
+    resolved_tenant = (tenant or "").strip() or tenant_id(jwt)
+    if not resolved_tenant:
+        raise AuthError(
+            "Missing tenant. Send a 'tenant' header, or use a token carrying "
+            "a custom:tenant_id claim."
+        )
+
+    return Caller(jwt=jwt, tenant=resolved_tenant)
 
 
-JWTToken = Annotated[str, Depends(get_jwt_token)]
+CallerDep = Annotated[Caller, Depends(get_caller)]

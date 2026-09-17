@@ -31,11 +31,9 @@ class Settings(BaseSettings):
     # agent
     agent_max_steps: int = 3
 
-    # crm
-    leadrat_base_url: str = "https://connect.leadrat.info"
-    leadrat_tenant: str = ""  # falls back to the JWT's custom:tenant_id claim
+    # crm - the caller's JWT and tenant arrive per request, never from here
+    leadrat_base_url: str = "https://connect.leadrat.info/api/v1/mcp"
     leadrat_timeout: int = 60
-    leadrat_jwt: str = ""  # dev fallback; real calls carry the caller's JWT
 
 
     @property

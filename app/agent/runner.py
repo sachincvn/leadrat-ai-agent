@@ -3,9 +3,10 @@
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app.agent.llm import get_llm
-from app.agent.prompts import SYSTEM_PROMPT
+from app.agent.prompts import SELECTED_LEAD_SUFFIX, SYSTEM_PROMPT
 from app.agent.tools import TOOLS, TOOLS_BY_NAME
 from app.core.config import settings
+from app.core.exceptions import LLMError
 from app.core.logging import get_logger
 
 log = get_logger(__name__)
@@ -24,14 +25,22 @@ def run_agent(
 ) -> AgentResult:
     llm = get_llm().bind_tools(TOOLS)
 
-    messages: list[BaseMessage] = [SystemMessage(SYSTEM_PROMPT.format(lead_id=lead_id or "none"))]
+    system = SYSTEM_PROMPT
+    if lead_id:
+        system += SELECTED_LEAD_SUFFIX.format(lead_id=lead_id)
+
+    messages: list[BaseMessage] = [SystemMessage(system)]
     messages += history or []
     messages.append(HumanMessage(message))
 
     tools_used: list[str] = []
 
     for _ in range(settings.agent_max_steps):
-        reply: AIMessage = llm.invoke(messages)
+        try:
+            reply: AIMessage = llm.invoke(messages)
+        except Exception as exc:  # noqa: BLE001 - any provider failure, reported as one
+            log.exception("LLM call failed")
+            raise LLMError(f"The model could not answer: {exc}") from exc
         messages.append(reply)
 
         tool_calls = getattr(reply, "tool_calls", None)
