@@ -18,6 +18,11 @@ class LeadNotFoundError(MusoError):
     code = "lead_not_found"
 
 
+class UserNotFoundError(MusoError):
+    status_code = 404
+    code = "user_not_found"
+
+
 class AuthError(MusoError):
     status_code = 401
     code = "unauthorized"
