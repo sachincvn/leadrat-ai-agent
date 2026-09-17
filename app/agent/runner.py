@@ -5,6 +5,7 @@ from collections.abc import Iterator
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 
+from app.agent.genui import render_blocks
 from app.agent.llm import get_llm
 from app.agent.llm.errors import describe_llm_failure
 from app.agent.prompts import RECENT_DATA_SUFFIX, SELECTED_LEAD_SUFFIX, SYSTEM_PROMPT
@@ -161,6 +162,7 @@ class StreamEvent:
 
     kind is one of:
       "status" - a tool is running, so the UI can say what MUSO is doing
+      "block"  - a renderable block built from a tool result (see agent/genui)
       "text"   - display-ready text to append to the answer
       "done"   - the turn finished; carries the full answer and tools used
     """
@@ -240,6 +242,11 @@ def stream_agent(
                 tools_used.append(call["name"])
             messages.append(ToolMessage(content=output, tool_call_id=call["id"]))
             tool_notes.append(f"{call['name']} -> {output[:TOOL_NOTE_CHARS]}")
+            # The data is on screen before the model has finished describing
+            # it, and it is the tool's own output - not something the model
+            # re-typed, and so not something it can get wrong.
+            for block in render_blocks(call["name"], output):
+                yield StreamEvent("block", name=block.name, props=block.props)
 
     answer = "I could not finish that within the step limit."
     yield StreamEvent("text", text=answer)
