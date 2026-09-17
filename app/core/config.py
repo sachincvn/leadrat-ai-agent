@@ -17,8 +17,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cors_origins: str = "*"
 
-    # llm
-    llm_provider: str = "ollama"  # ollama | huggingface | local_hf
+    # llm - Qwen on the Hugging Face router, the only provider
     llm_temperature: float = 0.1
     llm_max_tokens: int = 1500
     # Reasoning models (Qwen3, DeepSeek-R1, ...) spend most of their latency
@@ -26,15 +25,11 @@ class Settings(BaseSettings):
     # the prompt, not by chain-of-thought, so thinking is off by default.
     llm_disable_thinking: bool = True
     llm_timeout: int = 90
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen3:8b"
     hf_api_token: str = ""
     hf_model: str = "Qwen/Qwen3-235B-A22B-Instruct-2507"
     # OpenAI-compatible HF router: native tool calling, much faster and far
     # more reliable than the raw text-generation endpoint.
     hf_base_url: str = "https://router.huggingface.co/v1"
-    local_hf_model: str = "Qwen/Qwen3-8B"
-    local_hf_load_4bit: bool = False
 
     # agent
     agent_max_steps: int = 5
@@ -45,12 +40,12 @@ class Settings(BaseSettings):
 
 
     @property
+    def llm_provider(self) -> str:
+        return "huggingface"
+
+    @property
     def active_model(self) -> str:
-        return {
-            "ollama": self.ollama_model,
-            "huggingface": self.hf_model,
-            "local_hf": self.local_hf_model,
-        }.get(self.llm_provider, "unknown")
+        return self.hf_model
 
     @property
     def allowed_origins(self) -> list[str]:

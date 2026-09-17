@@ -126,7 +126,6 @@ def run_agent(
         try:
             reply: AIMessage = llm.invoke(messages)
         except Exception as exc:  # noqa: BLE001 - any provider failure, reported as one
-            log.exception("LLM call failed")
             raise LLMError(describe_llm_failure(exc)) from exc
 
         tool_calls = getattr(reply, "tool_calls", None)
@@ -204,8 +203,17 @@ def stream_agent(
                     answer_parts.append(text)
                     yield StreamEvent("text", text=text)
         except Exception as exc:  # noqa: BLE001 - any provider failure, reported as one
-            log.exception("LLM call failed")
-            raise LLMError(describe_llm_failure(exc)) from exc
+            # A stream that has already started cannot become an HTTP error, and
+            # a half-written answer followed by nothing is worse than a sentence
+            # saying so. The turn ends normally, carrying the failure message.
+            notice = describe_llm_failure(exc)
+            partial = "".join(answer_parts).strip()
+            answer = partial + "\n\n" + notice if partial else notice
+            yield StreamEvent("text", text=notice)
+            yield StreamEvent(
+                "done", answer=answer, tools_used=tools_used, tool_notes=tool_notes
+            )
+            return
 
         tool_calls = getattr(reply, "tool_calls", None) if reply is not None else None
 
