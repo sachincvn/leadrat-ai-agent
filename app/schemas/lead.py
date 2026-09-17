@@ -69,3 +69,54 @@ class LeadFilters(BaseModel):
     status_ids: list[str] | None = None
     assigned_to_ids: list[str] | None = None
     limit: int = 10
+
+
+class LeadStatusCount(BaseModel):
+    """One status's (or sub-status's) lead count, from the custom-filters-count API."""
+
+    name: str | None = None
+    count: int = 0
+    sub_status_counts: list["LeadStatusCount"] | None = None
+
+
+class LeadBaseFilterCounts(BaseModel):
+    """Generic base-filter lead counts, from POST /lead/new/counts/basefilter."""
+
+    all_leads_count: int = 0
+    my_leads_count: int = 0
+    team_leads_count: int = 0
+    unassign_leads_count: int | None = None
+    deleted_leads_count: int = 0
+    duplicate_leads_count: int = 0
+    re_enquired_leads_count: int = 0
+    pending_assignment_leads_count: int = 0
+
+
+class LeadActiveCounts(BaseModel):
+    """Active-pipeline lead counts, from POST /lead/counts/active (regular tenants only).
+
+    Every field is nullable on the wire - the backend leaves buckets it did
+    not compute as null.
+    """
+
+    active_leads_count: int | None = None
+    new_leads_count: int | None = None
+    pending_leads_count: int | None = None
+    scheduled_leads_count: int | None = None
+    overdue_leads_count: int | None = None
+    booked_leads_count: int | None = None
+    scheduled_today_leads_count: int | None = None
+    scheduled_tomorrow_leads_count: int | None = None
+    scheduled_next_two_days_leads_count: int | None = None
+    upcoming_scheduled_leads_count: int | None = None
+    site_visits_count: int | None = None
+    meetings_count: int | None = None
+    callback_count: int | None = None
+    all_leads_count: int | None = None
+    overdue_meeting_count: int | None = None
+    overdue_site_visit_count: int | None = None
+    overdue_callback_count: int | None = None
+    booking_cancel_lead_count: int | None = None
+    expression_of_interest_lead_count: int | None = None
+    invoiced_leads_count: int | None = None
+    pool_leads_count: int | None = None
