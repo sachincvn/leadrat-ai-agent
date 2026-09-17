@@ -36,3 +36,27 @@ def display_name(code: int | None) -> str | None:
 def code_for(name: str) -> int | None:
     """Resolve a source the user typed, e.g. 'facebook' -> 2."""
     return _NAME_TO_CODE.get(_normalize(name))
+
+
+# "Microsite" is a virtual alias covering both the property and project
+# microsite sources at once, matching old mcp's behaviour: a caller who
+# does not say which kind ("leads from microsite") means both.
+_MICROSITE_ALIASES: dict[str, list[int]] = {
+    "microsite": [13, 35],
+    "propertymicrosite": [13],
+    "projectmicrosite": [35],
+}
+
+
+def codes_for(name: str) -> list[int]:
+    """Resolve one source name to one or more codes.
+
+    Most names map to a single code via `code_for`; "Microsite" (and the
+    explicit "PropertyMicrosite"/"ProjectMicrosite") expand to the codes
+    above. Returns an empty list for a name that doesn't match anything.
+    """
+    alias = _MICROSITE_ALIASES.get(_normalize(name))
+    if alias is not None:
+        return alias
+    code = code_for(name)
+    return [code] if code is not None else []

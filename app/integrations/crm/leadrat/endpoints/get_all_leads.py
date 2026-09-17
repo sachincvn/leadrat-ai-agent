@@ -7,8 +7,17 @@ call and Leadrat answers 500 without them:
 
 Empty strings are rejected for typed fields, so a filter the user did not give
 is omitted rather than sent as "".
+
+`build_body` is the single shared builder for every lead search/count
+endpoint (get_all_leads, get_leads_custom_filters, get_lead_status_counts,
+get_leads_custom_filters_count, get_lead_base_filter_counts,
+get_lead_active_counts) - all six take the byte-for-byte identical request
+shape on the wire (confirmed against the live Swagger schema), so building
+the body once here and reusing it keeps them all in sync the way old mcp's
+LeadTools.buildLeadSearchFilter does for its own six callers.
 """
 
+import re
 from typing import Any
 
 from app.core.logging import get_logger
@@ -42,20 +51,105 @@ def build_body(filters: LeadFilters, page: int = 1, page_size: int = DEFAULT_PAG
     # Optional filters. Omitted entirely when unset - never sent as "" or null.
     if filters.keyword:
         body["SearchByNameOrNumber"] = filters.keyword
-    if filters.location:
-        body["cities"] = [filters.location]
+
+    cities = list(filters.cities) if filters.cities else []
+    if filters.location and filters.location not in cities:
+        cities.append(filters.location)
+    if cities:
+        body["cities"] = cities
+
     if filters.lead_ids:
         body["leadIds"] = filters.lead_ids
     if filters.status_ids:
         body["statusIds"] = filters.status_ids
+    if filters.sub_status_ids:
+        body["subStatusIds"] = filters.sub_status_ids
     if filters.assigned_to_ids:
         body["assignTo"] = filters.assigned_to_ids
-    if filters.source:
+    if filters.secondary_user_ids:
+        body["secondaryUsers"] = filters.secondary_user_ids
+    if filters.owner_selection is not None:
+        body["ownerSelection"] = filters.owner_selection
+
+    if filters.source_codes:
+        body["source"] = filters.source_codes
+    elif filters.source:
         code = code_for(filters.source)
         if code is not None:
             body["source"] = [code]
         else:
             log.warning("Unknown lead source '%s' - filter ignored", filters.source)
+    if filters.sub_sources:
+        body["subSources"] = filters.sub_sources
+
+    if filters.filter_type is not None:
+        body["filterType"] = filters.filter_type
+    if filters.lead_visibility is not None:
+        body["leadVisibility"] = filters.lead_visibility
+    if filters.lead_tags:
+        body["leadTags"] = filters.lead_tags
+
+    if filters.date_filters:
+        body["dates"] = [
+            {
+                "multiDateType": d.date_type,
+                "multiFromDate": d.from_date,
+                "multiToDate": d.to_date,
+            }
+            for d in filters.date_filters
+        ]
+
+    if filters.min_budget is not None:
+        body["minBudget"] = filters.min_budget
+    if filters.max_budget is not None:
+        body["maxBudget"] = filters.max_budget
+
+    if filters.beds:
+        body["beds"] = filters.beds
+    if filters.baths:
+        body["baths"] = filters.baths
+    if filters.no_of_bhks:
+        body["noOfBHKs"] = filters.no_of_bhks
+    if filters.bhk_type_codes:
+        body["bhkTypes"] = filters.bhk_type_codes
+
+    if filters.states:
+        body["states"] = filters.states
+    if filters.countries:
+        body["countries"] = filters.countries
+    if filters.zones:
+        body["zones"] = filters.zones
+    if filters.locations:
+        body["locations"] = filters.locations
+    if filters.projects:
+        body["projects"] = filters.projects
+
+    if filters.property_type_ids:
+        body["propertyType"] = filters.property_type_ids
+    if filters.property_sub_type_ids:
+        body["propertySubType"] = filters.property_sub_type_ids
+
+    if filters.purpose_codes:
+        body["purposes"] = filters.purpose_codes
+    if filters.offer_type_codes:
+        body["offerTypes"] = filters.offer_type_codes
+    if filters.furnished_codes:
+        body["furnished"] = filters.furnished_codes
+    if filters.profession_codes:
+        body["profession"] = filters.profession_codes
+    if filters.meeting_or_visit_status_codes:
+        body["meetingOrVisitStatuses"] = filters.meeting_or_visit_status_codes
+
+    if filters.company_name:
+        body["companyName"] = filters.company_name
+    if filters.referral_name:
+        body["referralName"] = filters.referral_name
+    if filters.is_with_team is not None:
+        body["isWithTeam"] = filters.is_with_team
+    if filters.campaign_names:
+        body["campaignNames"] = filters.campaign_names
+    if filters.utm_sources:
+        body["utmSources"] = filters.utm_sources
 
     return body
 
@@ -87,6 +181,66 @@ def total_count(payload: Any) -> int | None:
     return None
 
 
+_UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+
+def _is_uuid(val: Any) -> bool:
+    if not isinstance(val, str):
+        return False
+    v = val.strip()
+    if "user id:" in v.lower() or "id:" in v.lower():
+        return True
+    return bool(_UUID_RE.match(v))
+
+
+def _resolve_assigned_to(row: dict) -> str | None:
+    # 1. Direct name string fields on the lead row
+    for key in ("assignToName", "assignToUserName", "assignedToName", "assignedUserName", "primaryUserName"):
+        val = row.get(key)
+        if isinstance(val, str) and val.strip() and not _is_uuid(val):
+            return val.strip()
+
+    # 2. Objects under assignTo, primaryUser, assignedUser, user, etc.
+    for key in ("assignTo", "primaryUser", "assignedUser", "user"):
+        obj = row.get(key)
+        if isinstance(obj, dict):
+            name = obj.get("name") or obj.get("displayName") or obj.get("userName")
+            if not name and (obj.get("firstName") or obj.get("lastName")):
+                name = f"{obj.get('firstName') or ''} {obj.get('lastName') or ''}".strip()
+            if isinstance(name, str) and name.strip() and not _is_uuid(name):
+                return name.strip()
+
+    # 3. Users list on the row
+    users = row.get("users")
+    if isinstance(users, list) and users:
+        first = users[0]
+        if isinstance(first, dict):
+            name = first.get("name") or first.get("userName")
+            if not name and (first.get("firstName") or first.get("lastName")):
+                name = f"{first.get('firstName') or ''} {first.get('lastName') or ''}".strip()
+            if isinstance(name, str) and name.strip() and not _is_uuid(name):
+                return name.strip()
+        elif isinstance(first, str) and first.strip() and not _is_uuid(first):
+            return first.strip()
+
+    # 4. If assignTo / assignedTo is a raw UUID string, attempt to resolve via list_users()
+    raw_id = row.get("assignTo") or row.get("assignedTo")
+    if isinstance(raw_id, str) and raw_id.strip() and _is_uuid(raw_id):
+        try:
+            from app.integrations.crm.factory import get_crm_client
+            user_list = get_crm_client().list_users()
+            clean_id = raw_id.strip()
+            for u in user_list:
+                if u.id == clean_id:
+                    name = f"{u.first_name or ''} {u.last_name or ''}".strip() or u.user_name
+                    if name and not _is_uuid(name):
+                        return name
+        except Exception as exc:
+            log.debug("Could not resolve user ID '%s' to name: %s", raw_id, exc)
+
+    return None
+
+
 def to_lead(row: dict) -> Lead:
     """Map one Leadrat row onto our Lead model."""
     status = row.get("status") or {}
@@ -112,7 +266,7 @@ def to_lead(row: dict) -> Lead:
         location=location,
         project=projects[0].get("name") if projects else None,
         requirement=row.get("notes"),
-        assigned_to=row.get("assignTo"),
+        assigned_to=_resolve_assigned_to(row),
         scheduled_at=row.get("scheduledDate"),
         created_at=row.get("createdOn"),
         last_modified_at=row.get("lastModifiedOn"),

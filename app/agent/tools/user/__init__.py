@@ -9,8 +9,9 @@ Only the two lines below are shared, so parallel work rarely conflicts.
 
 from langchain_core.tools import BaseTool
 
+from app.agent.tools.user.get_current_user import get_current_user
 from app.agent.tools.user.get_my_profile import get_my_profile
 from app.agent.tools.user.get_user_profile import get_user_profile
 from app.agent.tools.user.list_users import list_users
 
-USER_TOOLS: list[BaseTool] = [get_my_profile, list_users, get_user_profile]
+USER_TOOLS: list[BaseTool] = [get_current_user, get_my_profile, list_users, get_user_profile]

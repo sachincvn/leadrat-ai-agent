@@ -42,6 +42,16 @@ def chat(message: str, jwt: str | None = None, tenant: str | None = None) -> dic
     return _check(resp)
 
 
+def clear_chat_history(jwt: str, tenant: str) -> dict:
+    """Forget the caller's server-side conversation memory."""
+    resp = requests.delete(
+        f"{BASE}/chat/history",
+        headers=_headers(jwt, tenant),
+        timeout=REQUEST_TIMEOUT,
+    )
+    return _check(resp)
+
+
 def search_leads(jwt: str, tenant: str, limit: int = 5) -> dict:
     resp = requests.get(
         f"{BASE}/leads/search",
