@@ -17,7 +17,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     cors_origins: str = "*"
 
-    # llm - Qwen on the Hugging Face router, the only provider
+    # llm
+    llm_provider: str = "huggingface"  # huggingface | mistral
     llm_temperature: float = 0.1
     llm_max_tokens: int = 1500
     # Reasoning models (Qwen3, DeepSeek-R1, ...) spend most of their latency
@@ -30,6 +31,10 @@ class Settings(BaseSettings):
     # OpenAI-compatible HF router: native tool calling, much faster and far
     # more reliable than the raw text-generation endpoint.
     hf_base_url: str = "https://router.huggingface.co/v1"
+    mistral_api_key: str = ""
+    mistral_model: str = "mistral-large-latest"
+    # La Plateforme is OpenAI-compatible, so it reuses the same client.
+    mistral_base_url: str = "https://api.mistral.ai/v1"
 
     # agent
     agent_max_steps: int = 5
@@ -40,12 +45,11 @@ class Settings(BaseSettings):
 
 
     @property
-    def llm_provider(self) -> str:
-        return "huggingface"
-
-    @property
     def active_model(self) -> str:
-        return self.hf_model
+        return {
+            "huggingface": self.hf_model,
+            "mistral": self.mistral_model,
+        }.get(self.llm_provider, "unknown")
 
     @property
     def allowed_origins(self) -> list[str]:

@@ -27,24 +27,43 @@ JWT — see *Authentication* below.
 
 ### 1. Configure the model
 
-One provider: **Qwen on the Hugging Face router**. Nothing to install, no GPU,
-~1.3 s to a tool call.
+Two providers, switched by `LLM_PROVIDER` in `.env`. Both speak the OpenAI
+protocol and both are chosen for the same reason: native tool calling, so calls
+arrive as structured `tool_calls` rather than text to be parsed out of a
+completion.
+
+**A — Mistral La Plateforme** (`mistral`)
 
 ```
+LLM_PROVIDER=mistral
+MISTRAL_API_KEY=...
+MISTRAL_MODEL=ministral-8b-latest
+```
+
+The free tier serves `ministral-8b-latest`. `mistral-small-latest` and
+`mistral-medium-latest` are stronger but need a paid tier — without one they
+answer `403 tier_not_allowed`. `LLM_DISABLE_THINKING` does not apply here:
+`chat_template_kwargs` is a vLLM/TGI extension the HF router forwards into the
+template, and Mistral rejects it.
+
+**B — Hugging Face router** (`huggingface`)
+
+```
+LLM_PROVIDER=huggingface
 HF_API_TOKEN=hf_xxxxxxxx
 HF_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507
 ```
 
-The router is OpenAI-compatible, so tool calls arrive as structured
-`tool_calls` rather than text to be parsed out of a completion. Pick a model the
-router actually serves **with tool support** — `Qwen/Qwen3-8B` and `Qwen3-32B`
-answer but never emit a tool call, which makes the whole agent useless. Known
-good: `Qwen/Qwen3-235B-A22B-Instruct-2507`, `meta-llama/Llama-3.3-70B-Instruct`.
+Pick a model the router actually serves **with tool support** — `Qwen/Qwen3-8B`
+and `Qwen3-32B` answer but never emit a tool call, which makes the whole agent
+useless. Known good: `Qwen/Qwen3-235B-A22B-Instruct-2507`,
+`meta-llama/Llama-3.3-70B-Instruct`.
 
-There is deliberately no fallback provider. A second model answering on the days
-the first is unavailable would change tool-calling behaviour without anyone
-noticing; instead the turn ends with *"MUSO is temporarily unavailable"* and the
-real cause (out of credits, rate limited, rejected key) goes to the server log.
+There is deliberately no fallback between the two. A second model answering on
+the days the first is unavailable would change tool-calling behaviour without
+anyone noticing; instead the turn ends with *"MUSO is temporarily unavailable"*
+and the real cause (out of credits, rate limited, rejected key) goes to the
+server log.
 
 The model must support **tool calling**. Without it the agent can only answer in
 plain text.
@@ -163,7 +182,8 @@ app/
     runner.py                agent loop: ask -> tool -> answer
     prompts.py               prompt templates
     llm/                     provider abstraction
-      base.py  factory.py  huggingface_provider.py  errors.py
+      base.py  factory.py  errors.py
+      huggingface_provider.py  mistral_provider.py
     tools/                   what the LLM is allowed to do
       registry.py              aggregates every module's tool list
       lead/                    one file per CRM API
@@ -209,8 +229,8 @@ Nothing lower imports something higher, so any layer can be replaced on its own.
 |---------|-----|
 | `uvicorn`/`streamlit` *is not recognized* | venv not active — run `.venv\Scriptsctivate`, or use `python -m uvicorn` / `python -m streamlit` |
 | `Backend unreachable` in the UI | Backend not running, or `API_URL` is wrong in `.env` |
-| `MUSO is temporarily unavailable` on every turn | Check the server log for the classified cause — `(402)` means the HF account is out of credits, `(429)` rate limited, `(401/403)` a bad `HF_API_TOKEN` |
-| The model never calls a tool | The chosen model has no tool support on the router — switch models (see *Configure the model*) |
+| `MUSO is temporarily unavailable` on every turn | Check the server log for the classified cause — `(402)` out of credits, `(429)` rate limited, `(401/403)` a bad key or a model above your tier |
+| The model never calls a tool | The chosen model has no tool support on that provider — switch models (see *Configure the model*) |
 | Answers are slow (4 s+) | A reasoning model is thinking — set `LLM_DISABLE_THINKING=true`, or use an `-Instruct` model |
 | The bot forgets the previous message | Conversation memory is keyed on the caller's JWT — a different/refreshed token starts a new conversation |
 | `401 unauthorized` | Missing or expired JWT — send `Authorization: Bearer <token>` |
