@@ -8,8 +8,21 @@ from app.integrations.crm.leadrat.endpoints import (
     get_lead_history,
     get_user_profile,
 )
+from app.integrations.crm.leadrat.endpoints.get_leads_custom_filters import get_leads_custom_filters
+from app.integrations.crm.leadrat.endpoints.get_leads_custom_filters_count import get_leads_custom_filters_count
+from app.integrations.crm.leadrat.endpoints.get_lead_active_counts import get_lead_active_counts
+from app.integrations.crm.leadrat.endpoints.get_lead_base_filter_counts import get_lead_base_filter_counts
+from app.integrations.crm.leadrat.endpoints.get_lead_status_counts import get_lead_status_counts
 from app.integrations.crm.leadrat.http import LeadratHttp
-from app.schemas.lead import Lead, LeadFilters, LeadHistoryPage, LeadPage
+from app.schemas.lead import (
+    Lead,
+    LeadActiveCounts,
+    LeadBaseFilterCounts,
+    LeadFilters,
+    LeadHistoryPage,
+    LeadPage,
+    LeadStatusCount,
+)
 from app.schemas.user import UserProfile, UserSummary
 
 
@@ -27,6 +40,21 @@ class LeadratClient:
 
     def search_leads(self, filters: LeadFilters) -> LeadPage:
         return get_all_leads(self._http, filters, page_size=filters.limit)
+
+    def search_leads_custom_filters(self, filters: LeadFilters) -> LeadPage:
+        return get_leads_custom_filters(self._http, filters, page_size=filters.limit)
+
+    def get_leads_custom_filters_count(self, filters: LeadFilters) -> list[LeadStatusCount]:
+        return get_leads_custom_filters_count(self._http, filters)
+
+    def get_lead_status_counts(self, filters: LeadFilters) -> list[LeadStatusCount]:
+        return get_lead_status_counts(self._http, filters)
+
+    def get_lead_base_filter_counts(self, filters: LeadFilters) -> LeadBaseFilterCounts | None:
+        return get_lead_base_filter_counts(self._http, filters)
+
+    def get_lead_active_counts(self, filters: LeadFilters) -> LeadActiveCounts | None:
+        return get_lead_active_counts(self._http, filters)
 
     def get_lead_history(self, lead_id: str, limit: int = 20) -> LeadHistoryPage:
         return get_lead_history(self._http, lead_id, page_size=limit)

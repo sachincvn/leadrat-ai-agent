@@ -57,7 +57,22 @@ class LeadratHttp:
         # Leadrat correlates a call across its services by this id.
         return {**self.headers, "X-Correlation-Id": str(uuid.uuid4())}
 
-    def _handle_response(self, path: str, resp: httpx.Response) -> Any:
+    def post(self, path: str, body: dict) -> Any:
+        return self._request("POST", path, json=body)
+
+    def get(self, path: str, params: dict | None = None) -> Any:
+        return self._request("GET", path, params=params)
+
+    def _request(self, method: str, path: str, **kwargs) -> Any:
+        url = f"{settings.leadrat_base_url}{path}"
+        log.info("%s %s %s", method, path, kwargs)
+        try:
+            resp = httpx.request(
+                method, url, headers=self._request_headers(), timeout=settings.leadrat_timeout, **kwargs
+            )
+        except httpx.HTTPError as exc:
+            raise CRMError(f"Leadrat request failed: {exc}") from exc
+
         if resp.status_code in (401, 403):
             raise AuthError("Leadrat rejected the JWT (expired or not permitted)")
 
@@ -67,31 +82,7 @@ class LeadratHttp:
             raise AuthError("Leadrat could not read the JWT - it is malformed or expired")
 
         if resp.status_code >= 400:
-            log.error("Leadrat %s -> %s %s", path, resp.status_code, resp.text[:1000])
+            log.error("Leadrat %s %s -> %s %s", method, path, resp.status_code, resp.text[:1000])
             raise CRMError(f"Leadrat returned {resp.status_code}: {_message(resp)}")
 
         return resp.json()
-
-    def post(self, path: str, body: dict) -> Any:
-        url = f"{settings.leadrat_base_url}{path}"
-        log.info("POST %s body=%s", path, body)
-        try:
-            resp = httpx.post(
-                url, json=body, headers=self._request_headers(), timeout=settings.leadrat_timeout
-            )
-        except httpx.HTTPError as exc:
-            raise CRMError(f"Leadrat request failed: {exc}") from exc
-
-        return self._handle_response(path, resp)
-
-    def get(self, path: str) -> Any:
-        url = f"{settings.leadrat_base_url}{path}"
-        log.info("GET %s", path)
-        try:
-            resp = httpx.get(
-                url, headers=self._request_headers(), timeout=settings.leadrat_timeout
-            )
-        except httpx.HTTPError as exc:
-            raise CRMError(f"Leadrat request failed: {exc}") from exc
-
-        return self._handle_response(path, resp)
