@@ -13,6 +13,7 @@ Planned (see product.md section 7):
 from langchain_core.tools import BaseTool
 
 from app.agent.tools.lead.get_lead import get_lead
+from app.agent.tools.lead.get_lead_active_counts import get_lead_active_counts
 from app.agent.tools.lead.get_lead_base_filter_counts import get_lead_base_filter_counts
 from app.agent.tools.lead.get_lead_counts_custom_filters import get_lead_counts_custom_filters
 from app.agent.tools.lead.get_lead_status_counts import get_lead_status_counts
@@ -26,4 +27,5 @@ LEAD_TOOLS: list[BaseTool] = [
     get_lead_counts_custom_filters,
     get_lead_status_counts,
     get_lead_base_filter_counts,
+    get_lead_active_counts,
 ]

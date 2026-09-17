@@ -4,10 +4,11 @@ from app.core.exceptions import LeadNotFoundError
 from app.integrations.crm.leadrat.endpoints import get_all_leads
 from app.integrations.crm.leadrat.endpoints.get_leads_custom_filters import get_leads_custom_filters
 from app.integrations.crm.leadrat.endpoints.get_leads_custom_filters_count import get_leads_custom_filters_count
+from app.integrations.crm.leadrat.endpoints.get_lead_active_counts import get_lead_active_counts
 from app.integrations.crm.leadrat.endpoints.get_lead_base_filter_counts import get_lead_base_filter_counts
 from app.integrations.crm.leadrat.endpoints.get_lead_status_counts import get_lead_status_counts
 from app.integrations.crm.leadrat.http import LeadratHttp
-from app.schemas.lead import Lead, LeadBaseFilterCounts, LeadFilters, LeadPage, LeadStatusCount
+from app.schemas.lead import Lead, LeadActiveCounts, LeadBaseFilterCounts, LeadFilters, LeadPage, LeadStatusCount
 
 
 class LeadratClient:
@@ -35,3 +36,6 @@ class LeadratClient:
 
     def get_lead_base_filter_counts(self, filters: LeadFilters) -> LeadBaseFilterCounts | None:
         return get_lead_base_filter_counts(self._http, filters)
+
+    def get_lead_active_counts(self, filters: LeadFilters) -> LeadActiveCounts | None:
+        return get_lead_active_counts(self._http, filters)
