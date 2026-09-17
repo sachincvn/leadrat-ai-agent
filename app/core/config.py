@@ -30,6 +30,9 @@ class Settings(BaseSettings):
 
     # agent
     agent_max_steps: int = 3
+    # the assistant turn needs more room: read a tool, then act on the screen,
+    # then report back, all within one turn
+    assistant_max_steps: int = 8
 
     # crm - the caller's JWT and tenant arrive per request, never from here
     leadrat_base_url: str = "https://connect.leadrat.info/api/v1/mcp"
