@@ -1,5 +1,8 @@
 """Thin HTTP client for the MUSO backend. The UI never calls the agent directly."""
 
+import json
+from collections.abc import Iterator
+
 import requests
 
 from ui.config import BASE, REQUEST_TIMEOUT
@@ -40,6 +43,27 @@ def chat(message: str, jwt: str | None = None, tenant: str | None = None) -> dic
         timeout=REQUEST_TIMEOUT,
     )
     return _check(resp)
+
+
+def chat_stream(message: str, jwt: str, tenant: str | None = None) -> Iterator[dict]:
+    """The chat answer as a stream of events: status, text, done, error.
+
+    Server-sent events, so each event arrives as one `data: {...}` line. The
+    connection stays open for the whole turn - `stream=True` matters, without
+    it requests would buffer the lot and the streaming would be for nothing.
+    """
+    with requests.post(
+        f"{BASE}/chat/stream",
+        json={"message": message},
+        headers={**_headers(jwt, tenant), "Accept": "text/event-stream"},
+        timeout=REQUEST_TIMEOUT,
+        stream=True,
+    ) as resp:
+        if resp.status_code >= 400:
+            _check(resp)  # raises ApiError carrying the backend's message
+        for line in resp.iter_lines(decode_unicode=True):
+            if line and line.startswith("data: "):
+                yield json.loads(line[6:])
 
 
 def clear_chat_history(jwt: str, tenant: str) -> dict:

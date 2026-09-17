@@ -81,16 +81,36 @@ if prompt := st.chat_input("Ask about your leads..."):
     with st.chat_message("user"):
         st.write(prompt)
 
-    with st.chat_message("assistant"), st.spinner("Thinking..."):
-        try:
-            data = api_client.chat(prompt, jwt=jwt, tenant=tenant)
-        except Exception as exc:
-            data = {"answer": f"Request failed - {exc}", "tools_used": []}
+    with st.chat_message("assistant"):
+        status = st.empty()
+        body = st.empty()
+        status.caption("Working...")
 
-        st.write(data["answer"])
-        if data.get("tools_used"):
-            st.caption("tools: " + ", ".join(data["tools_used"]))
+        answer = ""
+        tools_used: list[str] = []
+        try:
+            for event in api_client.chat_stream(prompt, jwt=jwt, tenant=tenant):
+                kind = event.get("type")
+                if kind == "status":
+                    # Name the CRM call being made, so the wait is explained
+                    # rather than just a spinner.
+                    status.caption(f"Looking up {event['tool'].replace('_', ' ')}...")
+                elif kind == "text":
+                    answer += event["text"]
+                    body.markdown(answer)
+                elif kind == "done":
+                    tools_used = event.get("tools_used", [])
+                elif kind == "error":
+                    answer = event["message"]
+                    body.markdown(answer)
+        except Exception as exc:
+            answer = f"Request failed - {exc}"
+            body.markdown(answer)
+
+        status.empty()
+        if tools_used:
+            st.caption("tools: " + ", ".join(tools_used))
 
     st.session_state.messages.append(
-        {"role": "assistant", "content": data["answer"], "tools_used": data.get("tools_used", [])}
+        {"role": "assistant", "content": answer, "tools_used": tools_used}
     )

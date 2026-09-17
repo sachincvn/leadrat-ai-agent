@@ -92,6 +92,7 @@ class LeadFilters(BaseModel):
     # free text / pagination
     keyword: str | None = None
     limit: int = 10
+    page: int = 1
 
     # legacy single-value convenience, still used by get_lead's id lookup
     # and kept so older call sites keep working

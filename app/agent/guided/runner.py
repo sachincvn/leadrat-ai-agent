@@ -26,6 +26,8 @@ from app.agent.llm import get_llm
 from app.agent.prompts import SELECTED_LEAD_SUFFIX
 from app.agent.tools import TOOLS, TOOLS_BY_NAME
 from app.core.config import settings
+from app.agent.llm.errors import describe_llm_failure
+from app.agent.sanitize import strip_internal_ids
 from app.core.exceptions import LLMError
 from app.core.logging import get_logger
 from app.schemas.assistant import (
@@ -99,11 +101,12 @@ def run_turn(request: AssistantTurnRequest) -> AssistantTurnResponse:
             reply: AIMessage = llm.invoke(messages)
         except Exception as exc:  # noqa: BLE001 - any provider failure, reported as one
             log.exception("LLM call failed")
-            raise LLMError(f"The model could not answer: {exc}") from exc
+            raise LLMError(describe_llm_failure(exc)) from exc
 
         messages.append(reply)
         calls = getattr(reply, "tool_calls", None) or []
         text = reply.content if isinstance(reply.content, str) else str(reply.content)
+        text = strip_internal_ids(text)
 
         appended.append(
             TranscriptEntry(

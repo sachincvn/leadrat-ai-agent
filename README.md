@@ -29,13 +29,20 @@ JWT — see *Authentication* below.
 
 Three providers, switched by `LLM_PROVIDER` in `.env`. All run open-source weights.
 
-**A — Hugging Face Inference API** (`huggingface`) — nothing to install, no GPU.
+**A — Hugging Face router** (`huggingface`) — nothing to install, no GPU. This is
+the default and the fastest option (~1.3 s to a tool call).
 
 ```
 LLM_PROVIDER=huggingface
 HF_API_TOKEN=hf_xxxxxxxx
-HF_MODEL=Qwen/Qwen3-8B
+HF_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507
 ```
+
+The router is OpenAI-compatible, so tool calls arrive as structured
+`tool_calls` rather than text to be parsed out of a completion. Pick a model the
+router actually serves **with tool support** — `Qwen/Qwen3-8B` and `Qwen3-32B`
+answer but never emit a tool call, which makes the whole agent useless. Known
+good: `Qwen/Qwen3-235B-A22B-Instruct-2507`, `meta-llama/Llama-3.3-70B-Instruct`.
 
 **B — Ollama** (`ollama`) — local, quantized, offloads to whatever GPU you have.
 
@@ -53,8 +60,12 @@ pip install torch --index-url https://download.pytorch.org/whl/cu124
 pip install transformers accelerate bitsandbytes
 ```
 
-Whichever you choose, the model must support **tool calling** (Qwen3, Qwen2.5-Instruct,
-Llama 3.1+, Mistral). Without it the agent can only answer in plain text.
+Whichever you choose, the model must support **tool calling**. Without it the
+agent can only answer in plain text.
+
+Reasoning models spend most of their latency on a `<think>` block nobody reads.
+`LLM_DISABLE_THINKING=true` (the default) turns it off at the provider, and any
+`<think>` that still slips through is stripped before the answer is returned.
 
 ### 2. Start the backend
 
@@ -198,7 +209,7 @@ Nothing lower imports something higher, so any layer can be replaced on its own.
 | New tools (`get_lead_history`, `get_lead_calls`, `get_lead_tasks`, `apply_lead_filter`) | one new file in `app/agent/tools/lead/`, appended to `LEAD_TOOLS` in that package's `__init__.py` |
 | A tool for another CRM module | new package `app/agent/tools/<module>/`, its list added to `tools/registry.py` |
 | Another LLM provider | implement `LLMProvider` in `app/agent/llm/`, add it to `factory.PROVIDERS` |
-| Conversation memory | `app/services/chat_service.py` — `run_agent()` already accepts `history` |
+| Conversation memory | `app/services/chat_history_store.py` — swap the in-process dict for Redis |
 | Source citations | `app/agent/runner.py` + `app/schemas/chat.py` |
 | RAG over CRM docs | new `app/rag/` package, exposed as one tool |
 | Write actions with confirmation | `chat_service.py` — return a pending action, confirm from the UI |
@@ -214,7 +225,9 @@ Nothing lower imports something higher, so any layer can be replaced on its own.
 | `Backend unreachable` in the UI | Backend not running, or `API_URL` is wrong in `.env` |
 | Health shows ollama but answers fail | `ollama serve` not running, or the model is not pulled |
 | `local_hf` is extremely slow | Model does not fit in VRAM — use `huggingface` or `ollama` instead |
-| The model never calls a tool | The chosen model does not support tool calling — switch models |
+| The model never calls a tool | The chosen model has no tool support on that provider — switch models (see *Pick the model*) |
+| Answers are slow (4 s+) | A reasoning model is thinking — set `LLM_DISABLE_THINKING=true`, or use an `-Instruct` model |
+| The bot forgets the previous message | Conversation memory is keyed on the caller's JWT — a different/refreshed token starts a new conversation |
 | `401 unauthorized` | Missing or expired JWT — send `Authorization: Bearer <token>` |
 | `.env` change had no effect | uvicorn was started before the edit — restart it, or run with `--reload-include .env` |
 | `401 unauthorized` from every call | No JWT sent, or it expired — paste a fresh one in the UI sidebar |

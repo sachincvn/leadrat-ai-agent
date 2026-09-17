@@ -231,6 +231,7 @@ def build_lead_filters(
     *,
     keyword: str = "",
     limit: int = 10,
+    page: int = 1,
     filter_type: str = "",
     lead_visibility: str = "",
     lead_tags: list[str] | None = None,
@@ -276,6 +277,7 @@ def build_lead_filters(
     return LeadFilters(
         keyword=keyword or None,
         limit=max(1, min(limit, 500)),
+        page=max(1, page),
         filter_type=parse_code(FILTER_TYPE, filter_type),
         lead_visibility=parse_code(LEAD_VISIBILITY, lead_visibility),
         lead_tags=parse_codes(LEAD_TAGS, lead_tags),

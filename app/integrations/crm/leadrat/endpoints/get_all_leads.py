@@ -193,7 +193,35 @@ def _is_uuid(val: Any) -> bool:
     return bool(_UUID_RE.match(v))
 
 
-def _resolve_assigned_to(row: dict) -> str | None:
+def user_directory() -> dict[str, str]:
+    """Map every user id in the tenant to a display name, fetched once.
+
+    Leadrat returns only `assignTo` (a UUID) on a lead row, so a name has to
+    come from the user list. Resolving row by row meant one full user-list
+    request per lead - ten leads, ten round trips - which is both slow and the
+    reason a whole page could come back with unresolved ids when one of those
+    requests failed. Built once per search instead, and never fatal: a failure
+    here costs the names, not the leads.
+    """
+    try:
+        from app.integrations.crm.factory import get_crm_client
+
+        directory: dict[str, str] = {}
+        for user in get_crm_client().list_users():
+            name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.user_name
+            if user.id and name and not _is_uuid(name):
+                directory[str(user.id).strip()] = name
+        return directory
+    except Exception as exc:  # noqa: BLE001 - names are a nicety, leads are not
+        log.warning("Could not load the user directory to resolve assignee names: %s", exc)
+        return {}
+
+
+def _resolve_assigned_to(row: dict, directory: dict[str, str] | None = None) -> str | None:
+    """The assignee's name, or None. Never an id - a raw UUID is worse than
+    nothing to whoever reads the answer, so an unresolved assignee is simply
+    left out.
+    """
     # 1. Direct name string fields on the lead row
     for key in ("assignToName", "assignToUserName", "assignedToName", "assignedUserName", "primaryUserName"):
         val = row.get(key)
@@ -223,25 +251,15 @@ def _resolve_assigned_to(row: dict) -> str | None:
         elif isinstance(first, str) and first.strip() and not _is_uuid(first):
             return first.strip()
 
-    # 4. If assignTo / assignedTo is a raw UUID string, attempt to resolve via list_users()
+    # 4. Last resort: look the raw id up in the directory fetched for this page.
     raw_id = row.get("assignTo") or row.get("assignedTo")
-    if isinstance(raw_id, str) and raw_id.strip() and _is_uuid(raw_id):
-        try:
-            from app.integrations.crm.factory import get_crm_client
-            user_list = get_crm_client().list_users()
-            clean_id = raw_id.strip()
-            for u in user_list:
-                if u.id == clean_id:
-                    name = f"{u.first_name or ''} {u.last_name or ''}".strip() or u.user_name
-                    if name and not _is_uuid(name):
-                        return name
-        except Exception as exc:
-            log.debug("Could not resolve user ID '%s' to name: %s", raw_id, exc)
+    if isinstance(raw_id, str) and _is_uuid(raw_id.strip()) and directory:
+        return directory.get(raw_id.strip())
 
     return None
 
 
-def to_lead(row: dict) -> Lead:
+def to_lead(row: dict, directory: dict[str, str] | None = None) -> Lead:
     """Map one Leadrat row onto our Lead model."""
     status = row.get("status") or {}
     enquiry = row.get("enquiry") or {}
@@ -266,12 +284,22 @@ def to_lead(row: dict) -> Lead:
         location=location,
         project=projects[0].get("name") if projects else None,
         requirement=row.get("notes"),
-        assigned_to=_resolve_assigned_to(row),
+        assigned_to=_resolve_assigned_to(row, directory),
         scheduled_at=row.get("scheduledDate"),
         created_at=row.get("createdOn"),
         last_modified_at=row.get("lastModifiedOn"),
         lead_number=row.get("leadNumber") or row.get("serialNumber"),
     )
+
+
+def directory_for(rows: list[dict]) -> dict[str, str]:
+    """Fetch the user directory only if some row actually needs it."""
+    needs_lookup = any(
+        isinstance(row.get("assignTo") or row.get("assignedTo"), str)
+        and _is_uuid((row.get("assignTo") or row.get("assignedTo")).strip())
+        for row in rows
+    )
+    return user_directory() if needs_lookup else {}
 
 
 def get_all_leads(
@@ -284,4 +312,5 @@ def get_all_leads(
     rows = extract_rows(payload)
     total = total_count(payload)
     log.info("get_all_leads -> %d rows (total %s)", len(rows), total)
-    return LeadPage(total=total, leads=[to_lead(row) for row in rows])
+    directory = directory_for(rows)
+    return LeadPage(total=total, leads=[to_lead(row, directory) for row in rows])

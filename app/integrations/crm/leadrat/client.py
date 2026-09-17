@@ -66,10 +66,10 @@ class LeadratClient:
         # separate tools the model would have to choose between (old mcp
         # hides this same choice inside its LeadService).
         try:
-            return get_all_leads(self._http, filters, page_size=filters.limit)
+            return get_all_leads(self._http, filters, page=filters.page, page_size=filters.limit)
         except CRMError as exc:
             log.warning("search_leads: /lead/new/all failed (%s), retrying via custom-filters", exc)
-            return get_leads_custom_filters(self._http, filters, page_size=filters.limit)
+            return get_leads_custom_filters(self._http, filters, page=filters.page, page_size=filters.limit)
 
     def get_lead_counts(self, filters: LeadFilters) -> LeadCounts:
         """Up to three independent count breakdowns for one filter, matching

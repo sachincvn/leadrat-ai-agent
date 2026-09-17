@@ -62,7 +62,9 @@ ask instead.
 
 ### 5.5 Follow-up questions
 Keep conversation context across turns so "when was the last call?" and "what was
-discussed?" stay on the same lead.
+discussed?" stay on the same lead. Both the turns and the records the tools
+returned are remembered, so "the second one" or a bare id resolves against real
+data instead of prompting the user again.
 
 ## 6. Agent behaviour
 
@@ -130,7 +132,7 @@ Streamlit test UI  (later: Leadrat UI)
 |-------|--------|
 | API | FastAPI, Pydantic v2 |
 | Agent | LangChain tool calling |
-| LLM | Qwen via Ollama (local) or Hugging Face Inference API (hosted) |
+| LLM | Qwen via Ollama (local) or the Hugging Face router (hosted, OpenAI-compatible); reasoning disabled for latency |
 | CRM | Leadrat REST API (`connect.leadrat.info`), authenticated per user by JWT |
 | Test UI | Streamlit |
 | RAG (planned) | ChromaDB + HuggingFace embeddings |
