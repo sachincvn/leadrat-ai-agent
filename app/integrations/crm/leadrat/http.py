@@ -57,16 +57,7 @@ class LeadratHttp:
         # Leadrat correlates a call across its services by this id.
         return {**self.headers, "X-Correlation-Id": str(uuid.uuid4())}
 
-    def post(self, path: str, body: dict) -> Any:
-        url = f"{settings.leadrat_base_url}{path}"
-        log.info("POST %s body=%s", path, body)
-        try:
-            resp = httpx.post(
-                url, json=body, headers=self._request_headers(), timeout=settings.leadrat_timeout
-            )
-        except httpx.HTTPError as exc:
-            raise CRMError(f"Leadrat request failed: {exc}") from exc
-
+    def _handle_response(self, path: str, resp: httpx.Response) -> Any:
         if resp.status_code in (401, 403):
             raise AuthError("Leadrat rejected the JWT (expired or not permitted)")
 
@@ -80,3 +71,27 @@ class LeadratHttp:
             raise CRMError(f"Leadrat returned {resp.status_code}: {_message(resp)}")
 
         return resp.json()
+
+    def post(self, path: str, body: dict) -> Any:
+        url = f"{settings.leadrat_base_url}{path}"
+        log.info("POST %s body=%s", path, body)
+        try:
+            resp = httpx.post(
+                url, json=body, headers=self._request_headers(), timeout=settings.leadrat_timeout
+            )
+        except httpx.HTTPError as exc:
+            raise CRMError(f"Leadrat request failed: {exc}") from exc
+
+        return self._handle_response(path, resp)
+
+    def get(self, path: str) -> Any:
+        url = f"{settings.leadrat_base_url}{path}"
+        log.info("GET %s", path)
+        try:
+            resp = httpx.get(
+                url, headers=self._request_headers(), timeout=settings.leadrat_timeout
+            )
+        except httpx.HTTPError as exc:
+            raise CRMError(f"Leadrat request failed: {exc}") from exc
+
+        return self._handle_response(path, resp)

@@ -7,9 +7,11 @@ Register a new module by importing its list and adding it here.
 from langchain_core.tools import BaseTool
 
 from app.agent.tools.lead import LEAD_TOOLS
+from app.agent.tools.user import USER_TOOLS
 
 TOOLS: list[BaseTool] = [
     *LEAD_TOOLS,
+    *USER_TOOLS,
     # *TASK_TOOLS,
     # *MEETING_TOOLS,
 ]
