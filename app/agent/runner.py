@@ -138,8 +138,22 @@ def run_agent(
                 output = f"Unknown tool: {call['name']}"
             else:
                 log.info("tool call: %s %s", call["name"], call["args"])
-                output = tool.invoke(call["args"])
-                tools_used.append(call["name"])
+                try:
+                    output = tool.invoke(call["args"])
+                    tools_used.append(call["name"])
+                except Exception as exc:  # noqa: BLE001 - a bad/incomplete tool call must not crash the turn
+                    # E.g. the model called get_lead with a missing or made-up
+                    # id: a Pydantic/LangChain validation error here would
+                    # otherwise propagate up and fail the whole request. Feed
+                    # it back as a normal tool result instead, so the model
+                    # gets a chance to recover - retry with a real id, search
+                    # by name first, or ask the user - in its next step.
+                    log.warning("tool call failed: %s %s (%s)", call["name"], call["args"], exc)
+                    output = (
+                        f"That call to {call['name']} failed: {exc}. "
+                        "If a required value was missing or guessed, get the real "
+                        "one (e.g. via search_leads) or ask the user, rather than retrying with a guess."
+                    )
             messages.append(ToolMessage(content=str(output), tool_call_id=call["id"]))
 
     return AgentResult("I could not finish that within the step limit.", tools_used)

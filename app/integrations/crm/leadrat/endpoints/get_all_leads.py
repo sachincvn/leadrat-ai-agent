@@ -7,6 +7,14 @@ call and Leadrat answers 500 without them:
 
 Empty strings are rejected for typed fields, so a filter the user did not give
 is omitted rather than sent as "".
+
+`build_body` is the single shared builder for every lead search/count
+endpoint (get_all_leads, get_leads_custom_filters, get_lead_status_counts,
+get_leads_custom_filters_count, get_lead_base_filter_counts,
+get_lead_active_counts) - all six take the byte-for-byte identical request
+shape on the wire (confirmed against the live Swagger schema), so building
+the body once here and reusing it keeps them all in sync the way old mcp's
+LeadTools.buildLeadSearchFilter does for its own six callers.
 """
 
 from typing import Any
@@ -42,20 +50,105 @@ def build_body(filters: LeadFilters, page: int = 1, page_size: int = DEFAULT_PAG
     # Optional filters. Omitted entirely when unset - never sent as "" or null.
     if filters.keyword:
         body["SearchByNameOrNumber"] = filters.keyword
-    if filters.location:
-        body["cities"] = [filters.location]
+
+    cities = list(filters.cities) if filters.cities else []
+    if filters.location and filters.location not in cities:
+        cities.append(filters.location)
+    if cities:
+        body["cities"] = cities
+
     if filters.lead_ids:
         body["leadIds"] = filters.lead_ids
     if filters.status_ids:
         body["statusIds"] = filters.status_ids
+    if filters.sub_status_ids:
+        body["subStatusIds"] = filters.sub_status_ids
     if filters.assigned_to_ids:
         body["assignTo"] = filters.assigned_to_ids
-    if filters.source:
+    if filters.secondary_user_ids:
+        body["secondaryUsers"] = filters.secondary_user_ids
+    if filters.owner_selection is not None:
+        body["ownerSelection"] = filters.owner_selection
+
+    if filters.source_codes:
+        body["source"] = filters.source_codes
+    elif filters.source:
         code = code_for(filters.source)
         if code is not None:
             body["source"] = [code]
         else:
             log.warning("Unknown lead source '%s' - filter ignored", filters.source)
+    if filters.sub_sources:
+        body["subSources"] = filters.sub_sources
+
+    if filters.filter_type is not None:
+        body["filterType"] = filters.filter_type
+    if filters.lead_visibility is not None:
+        body["leadVisibility"] = filters.lead_visibility
+    if filters.lead_tags:
+        body["leadTags"] = filters.lead_tags
+
+    if filters.date_filters:
+        body["dates"] = [
+            {
+                "multiDateType": d.date_type,
+                "multiFromDate": d.from_date,
+                "multiToDate": d.to_date,
+            }
+            for d in filters.date_filters
+        ]
+
+    if filters.min_budget is not None:
+        body["minBudget"] = filters.min_budget
+    if filters.max_budget is not None:
+        body["maxBudget"] = filters.max_budget
+
+    if filters.beds:
+        body["beds"] = filters.beds
+    if filters.baths:
+        body["baths"] = filters.baths
+    if filters.no_of_bhks:
+        body["noOfBHKs"] = filters.no_of_bhks
+    if filters.bhk_type_codes:
+        body["bhkTypes"] = filters.bhk_type_codes
+
+    if filters.states:
+        body["states"] = filters.states
+    if filters.countries:
+        body["countries"] = filters.countries
+    if filters.zones:
+        body["zones"] = filters.zones
+    if filters.locations:
+        body["locations"] = filters.locations
+    if filters.projects:
+        body["projects"] = filters.projects
+
+    if filters.property_type_ids:
+        body["propertyType"] = filters.property_type_ids
+    if filters.property_sub_type_ids:
+        body["propertySubType"] = filters.property_sub_type_ids
+
+    if filters.purpose_codes:
+        body["purposes"] = filters.purpose_codes
+    if filters.offer_type_codes:
+        body["offerTypes"] = filters.offer_type_codes
+    if filters.furnished_codes:
+        body["furnished"] = filters.furnished_codes
+    if filters.profession_codes:
+        body["profession"] = filters.profession_codes
+    if filters.meeting_or_visit_status_codes:
+        body["meetingOrVisitStatuses"] = filters.meeting_or_visit_status_codes
+
+    if filters.company_name:
+        body["companyName"] = filters.company_name
+    if filters.referral_name:
+        body["referralName"] = filters.referral_name
+    if filters.is_with_team is not None:
+        body["isWithTeam"] = filters.is_with_team
+    if filters.campaign_names:
+        body["campaignNames"] = filters.campaign_names
+    if filters.utm_sources:
+        body["utmSources"] = filters.utm_sources
 
     return body
 
