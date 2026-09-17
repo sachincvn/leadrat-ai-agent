@@ -21,7 +21,7 @@ async def lifespan(_: FastAPI):
         settings.app_name,
         settings.llm_provider,
         settings.active_model,
-        "mock" if settings.use_mock_crm else "live",
+        settings.leadrat_base_url,
     )
     yield
 

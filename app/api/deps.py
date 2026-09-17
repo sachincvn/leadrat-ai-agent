@@ -8,20 +8,15 @@ from app.core.config import settings
 from app.core.exceptions import AuthError
 
 
-def get_jwt_token(
-    authorization: Annotated[str | None, Header()] = None,
-) -> str:
-    """Leadrat JWT of the calling user, taken from `Authorization: Bearer <token>`.
+def get_jwt_token(authorization: Annotated[str | None, Header()] = None) -> str:
+    """Leadrat JWT of the calling user, from `Authorization: Bearer <token>`.
 
-    Falls back to LEADRAT_JWT in .env for local development. With the mock CRM
-    no token is needed at all.
+    Falls back to LEADRAT_JWT in .env for local development.
     """
     if authorization and authorization.lower().startswith("bearer "):
         return authorization.split(" ", 1)[1].strip()
     if settings.leadrat_jwt:
         return settings.leadrat_jwt
-    if settings.use_mock_crm:
-        return ""
     raise AuthError("Missing Leadrat JWT. Send 'Authorization: Bearer <token>'.")
 
 

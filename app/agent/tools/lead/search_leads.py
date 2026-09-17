@@ -1,7 +1,6 @@
 """Tool: search leads.
 
-Backed by POST /api/v1/mcp/lead/new/all on the live CRM, or the mock file
-in development.
+Backed by POST /api/v1/mcp/lead/new/all.
 """
 
 import json

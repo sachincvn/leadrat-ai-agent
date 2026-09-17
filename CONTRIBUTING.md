@@ -58,7 +58,7 @@ Nothing lower may import something higher.
 | Adding | Goes in |
 |--------|---------|
 | A new tool for the LLM | one file in `app/agent/tools/<module>/`, appended to that package's tool list |
-| A new CRM call | `app/integrations/crm/` — behind the `CRMClient` contract |
+| A new CRM call | one file in `app/integrations/crm/leadrat/endpoints/`, called from `client.py` |
 | A new LLM provider | `app/agent/llm/`, registered in `llm/factory.py` |
 | Orchestration, memory, confirmation flows | `app/services/` |
 | A new endpoint | `app/api/v1/routes/` — thin: validate, call a service, return |

@@ -17,7 +17,7 @@ with st.sidebar:
         "Leadrat JWT",
         value=st.session_state.get("jwt", ""),
         height=100,
-        help="Needed when the backend runs against the live CRM (USE_MOCK_CRM=false).",
+        help="Required — every CRM call is made as this user.",
     ).strip()
     st.session_state["jwt"] = jwt
 

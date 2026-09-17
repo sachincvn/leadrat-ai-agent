@@ -32,14 +32,11 @@ class Settings(BaseSettings):
     agent_max_steps: int = 3
 
     # crm
-    use_mock_crm: bool = True
     leadrat_base_url: str = "https://connect.leadrat.info"
     leadrat_tenant: str = ""  # falls back to the JWT's custom:tenant_id claim
     leadrat_timeout: int = 60
     leadrat_jwt: str = ""  # dev fallback; real calls carry the caller's JWT
 
-    # paths
-    mock_data_file: Path = BASE_DIR / "data" / "mock" / "leads.json"
 
     @property
     def active_model(self) -> str:

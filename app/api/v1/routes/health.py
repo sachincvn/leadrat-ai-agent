@@ -12,5 +12,5 @@ def health() -> HealthResponse:
         status="ok",
         llm_provider=settings.llm_provider,
         model=settings.active_model,
-        crm="mock" if settings.use_mock_crm else settings.leadrat_base_url,
+        crm=settings.leadrat_base_url,
     )

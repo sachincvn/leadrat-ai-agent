@@ -122,7 +122,6 @@ Streamlit test UI  (later: Leadrat UI)
                  or HF API)        │      (planned)
                                    ▼
                               Leadrat CRM API
-                          (mock JSON in development)
 ```
 
 ## 10. Stack
@@ -132,11 +131,9 @@ Streamlit test UI  (later: Leadrat UI)
 | API | FastAPI, Pydantic v2 |
 | Agent | LangChain tool calling |
 | LLM | Qwen via Ollama (local) or Hugging Face Inference API (hosted) |
-| CRM | Leadrat REST API; mock JSON client for development |
+| CRM | Leadrat REST API (`connect.leadrat.info`), authenticated per user by JWT |
 | Test UI | Streamlit |
 | RAG (planned) | ChromaDB + HuggingFace embeddings |
-
-Development uses synthetic data only. No real customer data.
 
 ## 11. MVP scope
 

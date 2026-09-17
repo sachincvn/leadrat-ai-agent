@@ -1,13 +1,12 @@
-"""Leadrat CRM client. Implements the CRMClient contract on the real API."""
+"""Leadrat CRM client — every method maps to one endpoint module."""
 
 from app.core.exceptions import LeadNotFoundError
-from app.integrations.crm.base import CRMClient
 from app.integrations.crm.leadrat.endpoints import get_all_leads
 from app.integrations.crm.leadrat.http import LeadratHttp
 from app.schemas.lead import Lead, LeadFilters
 
 
-class LeadratClient(CRMClient):
+class LeadratClient:
     def __init__(self, jwt: str):
         self._http = LeadratHttp(jwt)
 

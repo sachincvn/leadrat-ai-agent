@@ -3,8 +3,8 @@
 Conversational layer over Leadrat CRM: Streamlit UI → FastAPI → LLM with CRM tool
 calling → CRM data. Product spec: [`product.md`](product.md).
 
-Two lead tools are wired end-to-end so the whole path already works. Everything
-else is a marked place to plug into.
+Two lead tools are wired end-to-end against the live Leadrat API, so the whole
+path already works. Everything else is a marked place to plug into.
 
 ---
 
@@ -22,8 +22,8 @@ pip install -r requirements.txt
 copy .env.example .env           # cp on macOS / Linux
 ```
 
-Defaults in `.env` run against **mock CRM data** and a **local Ollama model**, so
-no Leadrat token is needed to get the project up.
+All CRM data comes from the live Leadrat API, so every request needs a Leadrat
+JWT — see *Authentication* below.
 
 ### 1. Pick the model
 
@@ -101,21 +101,13 @@ curl -X POST http://localhost:8000/api/v1/chat \
 
 ---
 
-## Running against the real Leadrat CRM
+## Authentication
 
-Authentication uses the **caller's Leadrat JWT** — not a service API key — so the
-CRM enforces that user's own permissions and tenant.
+Every request authenticates with the **caller's Leadrat JWT** — not a service API
+key — so Leadrat enforces that user's own permissions. The `tenant` header is read
+from the token's `custom:tenant_id` claim, so nothing else needs configuring.
 
-1. Fill in the real endpoints in `app/integrations/crm/leadrat_client.py`
-   (paths there are placeholders).
-2. Set in `.env`:
-
-   ```
-   USE_MOCK_CRM=false
-   LEADRAT_BASE_URL=https://api.leadrat.com
-   ```
-
-3. Send the token on every request:
+Send the token on every request:
 
    ```
    Authorization: Bearer <leadrat-jwt>
@@ -180,13 +172,16 @@ app/
       lead/                    one file per CRM API
         get_lead.py  search_leads.py
   integrations/crm/          external systems
-    base.py                  CRM contract
-    mock_client.py  leadrat_client.py  factory.py
+    factory.py               builds the client for the current request
+    leadrat/
+      http.py                session: JWT + tenant headers, error mapping
+      client.py              the CRM methods
+      endpoints/             one file per Leadrat API
+        get_all_leads.py
 ui/
   app.py                     Streamlit chat screen
   api_client.py              HTTP calls to the backend
   config.py
-data/mock/leads.json         synthetic leads
 ```
 
 Dependencies point one way:
@@ -199,7 +194,7 @@ Nothing lower imports something higher, so any layer can be replaced on its own.
 
 | Task | Where |
 |------|-------|
-| Real CRM endpoints | `app/integrations/crm/leadrat_client.py`, then `USE_MOCK_CRM=false` |
+| A new Leadrat endpoint | one file in `app/integrations/crm/leadrat/endpoints/`, called from `client.py` |
 | New tools (`get_lead_history`, `get_lead_calls`, `get_lead_tasks`, `apply_lead_filter`) | one new file in `app/agent/tools/lead/`, appended to `LEAD_TOOLS` in that package's `__init__.py` |
 | A tool for another CRM module | new package `app/agent/tools/<module>/`, its list added to `tools/registry.py` |
 | Another LLM provider | implement `LLMProvider` in `app/agent/llm/`, add it to `factory.PROVIDERS` |
@@ -221,14 +216,13 @@ Nothing lower imports something higher, so any layer can be replaced on its own.
 | `local_hf` is extremely slow | Model does not fit in VRAM — use `huggingface` or `ollama` instead |
 | The model never calls a tool | The chosen model does not support tool calling — switch models |
 | `401 unauthorized` | Missing or expired JWT — send `Authorization: Bearer <token>` |
-| `lead_not_found` on L001 | `USE_MOCK_CRM=false` while the live endpoints are still placeholders |
 | `.env` change had no effect | uvicorn was started before the edit — restart it, or run with `--reload-include .env` |
-| `/health` says `crm: mock` but `.env` says false | Same cause: the running process still holds the old settings |
+| `401 unauthorized` from every call | No JWT sent, or it expired — paste a fresh one in the UI sidebar |
 
 ---
 
 ## Conventions
 
-- `data/mock/` is synthetic. **No real customer data in this repo.**
+- Never commit CRM responses or tokens — the API returns real customer data.
 - `.env` is gitignored; only `.env.example` is committed. Never commit a JWT.
 - Routes stay thin — logic belongs in `services/`, CRM calls in `integrations/`.
