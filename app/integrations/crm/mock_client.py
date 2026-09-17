@@ -24,9 +24,14 @@ class MockCRMClient(CRMClient):
 
     def search_leads(self, filters: LeadFilters) -> list[Lead]:
         def matches(lead: Lead) -> bool:
-            for field, wanted in filters.model_dump(exclude_none=True).items():
-                if (getattr(lead, field) or "").lower() != str(wanted).lower():
+            if filters.lead_ids and lead.id not in filters.lead_ids:
+                return False
+            for field in ("source", "status", "location"):
+                wanted = getattr(filters, field)
+                if wanted and (getattr(lead, field) or "").lower() != wanted.lower():
                     return False
+            if filters.keyword and filters.keyword.lower() not in lead.name.lower():
+                return False
             return True
 
-        return [lead for lead in _load_leads() if matches(lead)]
+        return [lead for lead in _load_leads() if matches(lead)][: filters.limit]

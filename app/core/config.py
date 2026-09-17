@@ -33,7 +33,9 @@ class Settings(BaseSettings):
 
     # crm
     use_mock_crm: bool = True
-    leadrat_base_url: str = "https://api.leadrat.com"
+    leadrat_base_url: str = "https://connect.leadrat.info"
+    leadrat_tenant: str = ""  # falls back to the JWT's custom:tenant_id claim
+    leadrat_timeout: int = 60
     leadrat_jwt: str = ""  # dev fallback; real calls carry the caller's JWT
 
     # paths
