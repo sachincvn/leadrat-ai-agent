@@ -84,12 +84,15 @@ class LeadratHttp:
 
         return self._handle_response(path, resp)
 
-    def get(self, path: str) -> Any:
+    def get(self, path: str, params: dict | None = None) -> Any:
         url = f"{settings.leadrat_base_url}{path}"
-        log.info("GET %s", path)
+        log.info("GET %s params=%s", path, params)
         try:
             resp = httpx.get(
-                url, headers=self._request_headers(), timeout=settings.leadrat_timeout
+                url,
+                params=params,
+                headers=self._request_headers(),
+                timeout=settings.leadrat_timeout,
             )
         except httpx.HTTPError as exc:
             raise CRMError(f"Leadrat request failed: {exc}") from exc
