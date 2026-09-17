@@ -15,10 +15,10 @@ def health() -> dict:
     return resp.json()
 
 
-def chat(message: str, lead_id: str | None = None, jwt: str | None = None) -> dict:
+def chat(message: str, jwt: str | None = None) -> dict:
     resp = requests.post(
         f"{BASE}/chat",
-        json={"message": message, "lead_id": lead_id or None},
+        json={"message": message},
         headers=_headers(jwt),
         timeout=REQUEST_TIMEOUT,
     )

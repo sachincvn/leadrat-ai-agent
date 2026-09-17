@@ -12,25 +12,19 @@ st.session_state.setdefault("messages", [])
 
 with st.sidebar:
     st.caption(f"Backend: {BASE}")
-    lead_id = st.text_input("Selected lead", value="L001")
+
     jwt = st.text_area(
         "Leadrat JWT",
-        value="",
-        height=80,
-        help="Only needed when the backend runs against the live CRM (USE_MOCK_CRM=false).",
+        value=st.session_state.get("jwt", ""),
+        height=100,
+        help="Needed when the backend runs against the live CRM (USE_MOCK_CRM=false).",
     ).strip()
+    st.session_state["jwt"] = jwt
 
     try:
         st.json(api_client.health())
     except Exception as exc:
         st.error(f"Backend unreachable — {exc}")
-
-    if lead_id:
-        with st.expander("Lead record"):
-            try:
-                st.json(api_client.get_lead(lead_id, jwt))
-            except Exception as exc:
-                st.warning(str(exc))
 
     if st.button("Clear chat"):
         st.session_state.messages = []
@@ -42,14 +36,14 @@ for msg in st.session_state.messages:
         if msg.get("tools_used"):
             st.caption("tools: " + ", ".join(msg["tools_used"]))
 
-if prompt := st.chat_input("Ask about a lead..."):
+if prompt := st.chat_input("Ask about your leads..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.write(prompt)
 
     with st.chat_message("assistant"), st.spinner("Thinking..."):
         try:
-            data = api_client.chat(prompt, lead_id, jwt)
+            data = api_client.chat(prompt, jwt=jwt)
         except Exception as exc:
             data = {"answer": f"Request failed — {exc}", "tools_used": []}
 
