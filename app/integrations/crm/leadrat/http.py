@@ -58,11 +58,17 @@ class LeadratHttp:
         return {**self.headers, "X-Correlation-Id": str(uuid.uuid4())}
 
     def post(self, path: str, body: dict) -> Any:
+        return self._request("POST", path, json=body)
+
+    def get(self, path: str, params: dict | None = None) -> Any:
+        return self._request("GET", path, params=params)
+
+    def _request(self, method: str, path: str, **kwargs) -> Any:
         url = f"{settings.leadrat_base_url}{path}"
-        log.info("POST %s body=%s", path, body)
+        log.info("%s %s %s", method, path, kwargs)
         try:
-            resp = httpx.post(
-                url, json=body, headers=self._request_headers(), timeout=settings.leadrat_timeout
+            resp = httpx.request(
+                method, url, headers=self._request_headers(), timeout=settings.leadrat_timeout, **kwargs
             )
         except httpx.HTTPError as exc:
             raise CRMError(f"Leadrat request failed: {exc}") from exc
@@ -76,7 +82,7 @@ class LeadratHttp:
             raise AuthError("Leadrat could not read the JWT - it is malformed or expired")
 
         if resp.status_code >= 400:
-            log.error("Leadrat %s -> %s %s", path, resp.status_code, resp.text[:1000])
+            log.error("Leadrat %s %s -> %s %s", method, path, resp.status_code, resp.text[:1000])
             raise CRMError(f"Leadrat returned {resp.status_code}: {_message(resp)}")
 
         return resp.json()
