@@ -16,7 +16,12 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-BlockName = Literal["lead_list", "stat_tiles", "action_chips"]
+BlockName = Literal["record_list", "stat_tiles", "action_chips"]
+
+# Every CRM record the client can open. `kind` is what tells it which screen a
+# row belongs to, so one list block serves leads, projects, properties and
+# listings instead of four components that differ only in their route.
+RecordKind = Literal["lead", "project", "property", "listing"]
 
 
 class Block(BaseModel):
@@ -26,9 +31,8 @@ class Block(BaseModel):
     ignores a block whose name it does not know, so a server that is ahead of
     a deployed client degrades to text rather than breaking.
 
-    lead_list    {"title": str, "total": int|None,
-                  "leads": [{"id","name","phone","status","source",
-                             "location","project"}]}
+    record_list  {"title": str, "kind": RecordKind, "total": int|None,
+                  "records": [{"id", "title", "subtitle", "badge", "meta"}]}
     stat_tiles   {"title": str, "tiles": [{"label": str, "value": int}]}
     action_chips {"prompts": [str]}
     """

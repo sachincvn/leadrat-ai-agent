@@ -4,6 +4,11 @@ One renderer per tool, keyed by tool name. A tool with no renderer simply
 produces no blocks - the answer is then text only, which is the correct
 result for a tool whose output has no shape worth drawing.
 
+Every list tool maps onto the same record_list block. A record is reduced to
+four display slots - title, subtitle, badge, meta - because that is what a row
+in a chat panel has room for; which CRM field fills each slot is the only
+thing that differs between leads, projects, properties and listings.
+
 Renderers never raise: a block is a bonus on top of the answer, so anything
 unexpected in a tool result costs the block, not the turn.
 """
@@ -17,11 +22,9 @@ from app.core.logging import get_logger
 
 log = get_logger(__name__)
 
-# Fields lifted onto a lead row. The client shows what it has room for; the
-# rest of the tool output stays with the model.
-LEAD_ROW_FIELDS = ("id", "name", "phone", "status", "source", "location", "project")
+MAX_STATUS_TILES = 8
 
-# Only counts a user actually asks about. The counts API returns far more
+# Only counts a user actually asks about. The lead counts API returns far more
 # buckets than anyone wants on screen, most of them null for a given tenant.
 ACTIVE_COUNT_TILES = (
     ("new_leads_count", "New"),
@@ -37,48 +40,50 @@ BASE_COUNT_TILES = (
     ("team_leads_count", "Team leads"),
     ("unassign_leads_count", "Unassigned"),
 )
-MAX_STATUS_TILES = 8
+# Projects and properties are both counted by category, and each spells the
+# third one differently, so both spellings are listed and only one can match.
+CATEGORY_TILES = (
+    ("all", "All"),
+    ("residential", "Residential"),
+    ("commercial", "Commercial"),
+    ("agriculture", "Agriculture"),
+    ("agricultural", "Agricultural"),
+)
 
 
-def _row(lead: dict) -> dict:
-    return {key: lead.get(key) for key in LEAD_ROW_FIELDS if lead.get(key)}
+# ------------------------------------------------------------------ helpers
+
+
+def _join(*parts: Any) -> str:
+    """The non-empty parts of a subtitle, in the order given."""
+    return " · ".join(str(part) for part in parts if part not in (None, "", []))
+
+
+def _record_list(kind: str, title: str, total: Any, records: list[dict]) -> list[Block]:
+    rows = [record for record in records if record.get("id")]
+    if not rows:
+        return []
+    return [
+        Block(
+            name="record_list",
+            props={"title": title, "kind": kind, "total": total, "records": rows},
+        )
+    ]
 
 
 def _chips(*prompts: str) -> Block:
     return Block(name="action_chips", props={"prompts": list(prompts)})
 
 
-def _lead_list(data: dict) -> list[Block]:
-    leads = [_row(lead) for lead in data.get("leads", []) if lead.get("id")]
-    if not leads:
+def _more_chips(total: Any, shown: int, *prompts: str) -> list[Block]:
+    """Follow-ups, offered only where there is more to see.
+
+    On a complete result a "show the next ones" chip would return nothing,
+    which is worse than no chip at all.
+    """
+    if not total or total <= shown:
         return []
-
-    blocks = [
-        Block(
-            name="lead_list",
-            props={
-                "title": "Matching leads",
-                "total": data.get("total_matching_leads"),
-                "leads": leads,
-            },
-        )
-    ]
-    # Chips are offered only where there is more to see; on a complete result
-    # a "show the next ones" chip would return nothing.
-    total = data.get("total_matching_leads") or 0
-    if total > len(leads):
-        blocks.append(_chips("Show me the next ones", "Break these down by status"))
-    return blocks
-
-
-def _single_lead(data: dict) -> list[Block]:
-    row = _row(data)
-    if not row.get("id"):
-        return []
-    return [
-        Block(name="lead_list", props={"title": "Lead", "total": None, "leads": [row]}),
-        _chips("Summarize this lead", "Show this lead's history"),
-    ]
+    return [_chips(*prompts)]
 
 
 def _tiles(source: dict | None, fields: tuple[tuple[str, str], ...]) -> list[dict]:
@@ -91,30 +96,154 @@ def _tiles(source: dict | None, fields: tuple[tuple[str, str], ...]) -> list[dic
     ]
 
 
-def _lead_counts(data: dict) -> list[Block]:
-    tiles = _tiles(data.get("active_counts"), ACTIVE_COUNT_TILES)
-    if not tiles:
-        tiles = _tiles(data.get("base_filter_counts"), BASE_COUNT_TILES)
-
-    title = "Lead counts"
-    if not tiles:
-        # A custom-status tenant answers with per-status counts instead.
-        tiles = [
-            {"label": status["name"], "value": status.get("count", 0)}
-            for status in data.get("status_counts", [])
-            if status.get("name")
-        ][:MAX_STATUS_TILES]
-        title = "Leads by status"
-
+def _stat_tiles(title: str, tiles: list[dict]) -> list[Block]:
     if not tiles:
         return []
     return [Block(name="stat_tiles", props={"title": title, "tiles": tiles})]
 
 
-RENDERERS: dict[str, Callable[[Any], list[Block]]] = {
-    "search_leads": _lead_list,
+def _price_range(low: Any, high: Any) -> str:
+    if isinstance(low, (int, float)) and isinstance(high, (int, float)):
+        return f"{low:,.0f} - {high:,.0f}"
+    value = low if low is not None else high
+    return f"{value:,.0f}" if isinstance(value, (int, float)) else ""
+
+
+def _count_of(value: Any, unit: str) -> str | None:
+    return f"{value} {unit}" if value else None
+
+
+# ---------------------------------------------------------------- renderers
+
+
+def _leads(data: dict) -> list[Block]:
+    records = [
+        {
+            "id": lead.get("id"),
+            "title": lead.get("name"),
+            "subtitle": _join(lead.get("phone"), lead.get("location")),
+            "badge": lead.get("status"),
+            "meta": lead.get("source"),
+        }
+        for lead in data.get("leads", [])
+    ]
+    total = data.get("total_matching_leads")
+    return _record_list("lead", "Matching leads", total, records) + _more_chips(
+        total, len(records), "Show me the next ones", "Break these down by status"
+    )
+
+
+def _single_lead(data: dict) -> list[Block]:
+    blocks = _record_list(
+        "lead",
+        "Lead",
+        None,
+        [
+            {
+                "id": data.get("id"),
+                "title": data.get("name"),
+                "subtitle": _join(data.get("phone"), data.get("email")),
+                "badge": data.get("status"),
+                "meta": data.get("source"),
+            }
+        ],
+    )
+    if blocks:
+        blocks.append(_chips("Summarize this lead", "Show this lead's history"))
+    return blocks
+
+
+def _projects(data: dict) -> list[Block]:
+    records = [
+        {
+            "id": project.get("id"),
+            "title": project.get("name"),
+            "subtitle": _price_range(project.get("min_price"), project.get("max_price")),
+            "badge": project.get("status") or project.get("current_status"),
+            "meta": project.get("possession_date"),
+        }
+        for project in data.get("projects", [])
+    ]
+    total = data.get("total_matching_projects")
+    return _record_list("project", "Projects", total, records) + _more_chips(
+        total,
+        len(records),
+        "Show me the next ones",
+        "How many leads do these projects have?",
+    )
+
+
+def _properties(data: dict) -> list[Block]:
+    records = [
+        {
+            "id": prop.get("id"),
+            "title": prop.get("title"),
+            "subtitle": _join(_count_of(prop.get("no_of_bhk"), "BHK"), prop.get("project")),
+            "badge": prop.get("status"),
+            "meta": _join(prop.get("sale_type"), prop.get("furnish_status")),
+        }
+        for prop in data.get("properties", [])
+    ]
+    total = data.get("total_matching_properties")
+    return _record_list("property", "Properties", total, records) + _more_chips(
+        total, len(records), "Show me the next ones", "Break these down by type"
+    )
+
+
+def _listings(data: dict) -> list[Block]:
+    records = [
+        {
+            "id": listing.get("id"),
+            "title": listing.get("title"),
+            "subtitle": _join(
+                _count_of(listing.get("no_of_bedroom"), "bed"),
+                _count_of(listing.get("no_of_bathroom"), "bath"),
+                listing.get("project"),
+            ),
+            "badge": listing.get("status"),
+            "meta": _count_of(listing.get("lead_count"), "leads"),
+        }
+        for listing in data.get("listings", [])
+    ]
+    total = data.get("total_matching_listings")
+    return _record_list("listing", "Listings", total, records) + _more_chips(
+        total, len(records), "Show me the next ones"
+    )
+
+
+def _lead_counts(data: dict) -> list[Block]:
+    tiles = _tiles(data.get("active_counts"), ACTIVE_COUNT_TILES)
+    if not tiles:
+        tiles = _tiles(data.get("base_filter_counts"), BASE_COUNT_TILES)
+    if tiles:
+        return _stat_tiles("Lead counts", tiles)
+
+    # A custom-status tenant answers with per-status counts instead.
+    status_tiles = [
+        {"label": status["name"], "value": status.get("count", 0)}
+        for status in data.get("status_counts", [])
+        if status.get("name")
+    ][:MAX_STATUS_TILES]
+    return _stat_tiles("Leads by status", status_tiles)
+
+
+def _project_counts(data: dict) -> list[Block]:
+    return _stat_tiles("Projects", _tiles(data, CATEGORY_TILES))
+
+
+def _property_counts(data: dict) -> list[Block]:
+    return _stat_tiles("Properties", _tiles(data, CATEGORY_TILES))
+
+
+RENDERERS: dict[str, Callable[[dict], list[Block]]] = {
+    "search_leads": _leads,
     "get_lead": _single_lead,
     "get_lead_counts": _lead_counts,
+    "list_projects": _projects,
+    "get_project_count": _project_counts,
+    "list_properties": _properties,
+    "get_property_count": _property_counts,
+    "list_listings": _listings,
 }
 
 
@@ -130,7 +259,7 @@ def render_blocks(tool_name: str, output: str) -> list[Block]:
         # A failed tool call is fed back to the model as a sentence, not JSON.
         return []
 
-    if not isinstance(data, dict):
+    if not isinstance(data, dict) or data.get("error"):
         return []
 
     try:
