@@ -8,7 +8,7 @@ from collections.abc import Iterator
 
 from app.agent.runner import run_agent, stream_agent
 from app.api.deps import Caller
-from app.core.context import use_caller
+from app.core.context import iter_as_caller, use_caller
 from app.core.jwt_claims import user_id as jwt_user_id
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services import chat_history_store
@@ -55,23 +55,27 @@ def stream_chat(request: ChatRequest, caller: Caller) -> Iterator[dict]:
     history = chat_history_store.get_history(session_key)
     recent_tool_notes = chat_history_store.get_tool_notes(session_key)
 
-    with use_caller(caller.jwt, caller.tenant):
-        for event in stream_agent(
+    events = iter_as_caller(
+        caller.jwt,
+        caller.tenant,
+        lambda: stream_agent(
             message=request.message,
             lead_id=request.lead_id,
             history=history,
             recent_tool_notes=recent_tool_notes,
-        ):
-            if event.kind == "done":
-                chat_history_store.append_turn(
-                    session_key,
-                    request.message,
-                    event.data["answer"],
-                    event.data["tool_notes"],
-                )
-                yield {"type": "done", "tools_used": event.data["tools_used"]}
-            else:
-                yield {"type": event.kind, **event.data}
+        ),
+    )
+    for event in events:
+        if event.kind == "done":
+            chat_history_store.append_turn(
+                session_key,
+                request.message,
+                event.data["answer"],
+                event.data["tool_notes"],
+            )
+            yield {"type": "done", "tools_used": event.data["tools_used"]}
+        else:
+            yield {"type": event.kind, **event.data}
 
 
 def clear_chat_history(caller: Caller) -> None:

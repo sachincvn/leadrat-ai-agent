@@ -25,15 +25,12 @@ copy .env.example .env           # cp on macOS / Linux
 All CRM data comes from the live Leadrat API, so every request needs a Leadrat
 JWT — see *Authentication* below.
 
-### 1. Pick the model
+### 1. Configure the model
 
-Three providers, switched by `LLM_PROVIDER` in `.env`. All run open-source weights.
-
-**A — Hugging Face router** (`huggingface`) — nothing to install, no GPU. This is
-the default and the fastest option (~1.3 s to a tool call).
+One provider: **Qwen on the Hugging Face router**. Nothing to install, no GPU,
+~1.3 s to a tool call.
 
 ```
-LLM_PROVIDER=huggingface
 HF_API_TOKEN=hf_xxxxxxxx
 HF_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507
 ```
@@ -44,24 +41,13 @@ router actually serves **with tool support** — `Qwen/Qwen3-8B` and `Qwen3-32B`
 answer but never emit a tool call, which makes the whole agent useless. Known
 good: `Qwen/Qwen3-235B-A22B-Instruct-2507`, `meta-llama/Llama-3.3-70B-Instruct`.
 
-**B — Ollama** (`ollama`) — local, quantized, offloads to whatever GPU you have.
+There is deliberately no fallback provider. A second model answering on the days
+the first is unavailable would change tool-calling behaviour without anyone
+noticing; instead the turn ends with *"MUSO is temporarily unavailable"* and the
+real cause (out of credits, rate limited, rejected key) goes to the server log.
 
-```bash
-ollama pull qwen3:8b     # or qwen3:4b on a small GPU
-ollama serve
-```
-
-**C — transformers in-process** (`local_hf`) — the raw Hub weights, no Ollama.
-Needs ~16 GB VRAM at bf16, ~6 GB with `LOCAL_HF_LOAD_4BIT=true`. Below that it
-falls back to CPU and each answer takes minutes. Extra install:
-
-```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu124
-pip install transformers accelerate bitsandbytes
-```
-
-Whichever you choose, the model must support **tool calling**. Without it the
-agent can only answer in plain text.
+The model must support **tool calling**. Without it the agent can only answer in
+plain text.
 
 Reasoning models spend most of their latency on a `<think>` block nobody reads.
 `LLM_DISABLE_THINKING=true` (the default) turns it off at the provider, and any
@@ -177,7 +163,7 @@ app/
     runner.py                agent loop: ask -> tool -> answer
     prompts.py               prompt templates
     llm/                     provider abstraction
-      base.py  factory.py  ollama_provider.py  huggingface_provider.py
+      base.py  factory.py  huggingface_provider.py  errors.py
     tools/                   what the LLM is allowed to do
       registry.py              aggregates every module's tool list
       lead/                    one file per CRM API
@@ -223,9 +209,8 @@ Nothing lower imports something higher, so any layer can be replaced on its own.
 |---------|-----|
 | `uvicorn`/`streamlit` *is not recognized* | venv not active — run `.venv\Scriptsctivate`, or use `python -m uvicorn` / `python -m streamlit` |
 | `Backend unreachable` in the UI | Backend not running, or `API_URL` is wrong in `.env` |
-| Health shows ollama but answers fail | `ollama serve` not running, or the model is not pulled |
-| `local_hf` is extremely slow | Model does not fit in VRAM — use `huggingface` or `ollama` instead |
-| The model never calls a tool | The chosen model has no tool support on that provider — switch models (see *Pick the model*) |
+| `MUSO is temporarily unavailable` on every turn | Check the server log for the classified cause — `(402)` means the HF account is out of credits, `(429)` rate limited, `(401/403)` a bad `HF_API_TOKEN` |
+| The model never calls a tool | The chosen model has no tool support on the router — switch models (see *Configure the model*) |
 | Answers are slow (4 s+) | A reasoning model is thinking — set `LLM_DISABLE_THINKING=true`, or use an `-Instruct` model |
 | The bot forgets the previous message | Conversation memory is keyed on the caller's JWT — a different/refreshed token starts a new conversation |
 | `401 unauthorized` | Missing or expired JWT — send `Authorization: Bearer <token>` |

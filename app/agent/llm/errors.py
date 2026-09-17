@@ -53,6 +53,13 @@ def _cause(exc: Exception) -> str:
 
 
 def describe_llm_failure(exc: Exception) -> str:
-    """Log what actually went wrong; hand the caller the generic message."""
+    """Log what actually went wrong; hand the caller the generic message.
+
+    The classified cause is the whole point of the log line, so it goes out at
+    ERROR as one readable sentence. The traceback below it says nothing an
+    operator cannot already read off the status code, so it is kept at DEBUG
+    rather than printed in full on every failed turn.
+    """
     log.error("LLM call failed: %s", _cause(exc))
+    log.debug("LLM call failed", exc_info=exc)
     return GENERIC_LLM_FAILURE
