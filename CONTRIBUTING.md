@@ -57,7 +57,7 @@ Nothing lower may import something higher.
 
 | Adding | Goes in |
 |--------|---------|
-| A new tool for the LLM | `app/agent/tools/lead_tools.py`, registered in `tools/registry.py` |
+| A new tool for the LLM | one file in `app/agent/tools/<module>/`, appended to that package's tool list |
 | A new CRM call | `app/integrations/crm/` — behind the `CRMClient` contract |
 | A new LLM provider | `app/agent/llm/`, registered in `llm/factory.py` |
 | Orchestration, memory, confirmation flows | `app/services/` |
@@ -65,6 +65,28 @@ Nothing lower may import something higher.
 | Settings | `app/core/config.py` **and** `.env.example` |
 
 Routes stay thin. Business logic belongs in `services/`, external calls in `integrations/`.
+
+## Adding a tool
+
+One file per CRM API, grouped by module, so two people adding tools rarely touch
+the same file.
+
+```
+app/agent/tools/
+  registry.py              every module's list, combined
+  lead/
+    __init__.py            LEAD_TOOLS = [get_lead, search_leads]
+    get_lead.py            one @tool function
+    search_leads.py
+```
+
+1. Create `app/agent/tools/lead/get_lead_history.py` with a single `@tool` function.
+   Its docstring is what the model reads to decide when to call it — be precise.
+2. Import it in `app/agent/tools/lead/__init__.py` and append it to `LEAD_TOOLS`.
+3. A whole new module (tasks, meetings) gets its own package plus one line in
+   `registry.py`.
+
+Keep tools thin: call the CRM client, return JSON. Logic belongs in `services/`.
 
 ## Open work
 

@@ -1,8 +1,4 @@
-"""Lead tools exposed to the LLM.
-
-Each tool is a thin wrapper over the CRM client — no business logic here.
-Docstrings matter: the model reads them to decide which tool to call.
-"""
+"""Tool: search leads by structured conditions."""
 
 import json
 
@@ -10,12 +6,6 @@ from langchain_core.tools import tool
 
 from app.integrations.crm.factory import get_crm_client
 from app.schemas.lead import LeadFilters
-
-
-@tool
-def get_lead(lead_id: str) -> str:
-    """Get the details of one lead by its id, for example L001."""
-    return get_crm_client().get_lead(lead_id).model_dump_json()
 
 
 @tool

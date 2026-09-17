@@ -172,7 +172,9 @@ app/
     llm/                     provider abstraction
       base.py  factory.py  ollama_provider.py  huggingface_provider.py
     tools/                   what the LLM is allowed to do
-      registry.py  lead_tools.py
+      registry.py              aggregates every module's tool list
+      lead/                    one file per CRM API
+        get_lead.py  search_leads.py
   integrations/crm/          external systems
     base.py                  CRM contract
     mock_client.py  leadrat_client.py  factory.py
@@ -194,7 +196,8 @@ Nothing lower imports something higher, so any layer can be replaced on its own.
 | Task | Where |
 |------|-------|
 | Real CRM endpoints | `app/integrations/crm/leadrat_client.py`, then `USE_MOCK_CRM=false` |
-| New tools (`get_lead_history`, `get_lead_calls`, `get_lead_tasks`, `apply_lead_filter`) | add to `app/agent/tools/lead_tools.py`, register in `tools/registry.py` |
+| New tools (`get_lead_history`, `get_lead_calls`, `get_lead_tasks`, `apply_lead_filter`) | one new file in `app/agent/tools/lead/`, appended to `LEAD_TOOLS` in that package's `__init__.py` |
+| A tool for another CRM module | new package `app/agent/tools/<module>/`, its list added to `tools/registry.py` |
 | Another LLM provider | implement `LLMProvider` in `app/agent/llm/`, add it to `factory.PROVIDERS` |
 | Conversation memory | `app/services/chat_service.py` — `run_agent()` already accepts `history` |
 | Source citations | `app/agent/runner.py` + `app/schemas/chat.py` |

@@ -1,14 +1,17 @@
 """The tool set the agent is allowed to use.
 
-To add a capability: write the tool in a *_tools.py module, then register it here.
-
-Planned next (see product.md section 14):
-    get_lead_history, get_lead_calls, get_lead_tasks, apply_lead_filter
+Tools are grouped by CRM module, one package per module, one file per API.
+Register a new module by importing its list and adding it here.
 """
 
 from langchain_core.tools import BaseTool
 
-from app.agent.tools.lead_tools import get_lead, search_leads
+from app.agent.tools.lead import LEAD_TOOLS
 
-TOOLS: list[BaseTool] = [get_lead, search_leads]
+TOOLS: list[BaseTool] = [
+    *LEAD_TOOLS,
+    # *TASK_TOOLS,
+    # *MEETING_TOOLS,
+]
+
 TOOLS_BY_NAME: dict[str, BaseTool] = {t.name: t for t in TOOLS}
