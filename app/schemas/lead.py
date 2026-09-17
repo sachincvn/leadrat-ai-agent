@@ -43,3 +43,11 @@ class LeadFilters(BaseModel):
     status_ids: list[str] | None = None
     assigned_to_ids: list[str] | None = None
     limit: int = 10
+
+
+class LeadStatusCount(BaseModel):
+    """One status's (or sub-status's) lead count, from the custom-filters-count API."""
+
+    name: str | None = None
+    count: int = 0
+    sub_status_counts: list["LeadStatusCount"] | None = None
