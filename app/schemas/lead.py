@@ -51,3 +51,16 @@ class LeadStatusCount(BaseModel):
     name: str | None = None
     count: int = 0
     sub_status_counts: list["LeadStatusCount"] | None = None
+
+
+class LeadBaseFilterCounts(BaseModel):
+    """Generic base-filter lead counts, from POST /lead/new/counts/basefilter."""
+
+    all_leads_count: int = 0
+    my_leads_count: int = 0
+    team_leads_count: int = 0
+    unassign_leads_count: int | None = None
+    deleted_leads_count: int = 0
+    duplicate_leads_count: int = 0
+    re_enquired_leads_count: int = 0
+    pending_assignment_leads_count: int = 0
