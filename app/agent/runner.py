@@ -77,10 +77,7 @@ def _describe_llm_failure(exc: Exception) -> str:
 # to the user as if it were a real answer.
 _LEAKED_TOOL_CALL_RE = re.compile(r"<tool_call>|\"arguments\"\s*:")
 
-_UNUSABLE_REPLY_MESSAGE = (
-    "I couldn't process that properly - could you rephrase it as a plain question? "
-    "For example: \"show lead <id>'s history\" or \"who is <name>\"."
-)
+_UNUSABLE_REPLY_MESSAGE = "I couldn't process that properly"
 
 
 def _reply_is_unusable(content: str) -> bool:

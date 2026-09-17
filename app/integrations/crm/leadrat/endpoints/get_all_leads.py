@@ -17,6 +17,7 @@ the body once here and reusing it keeps them all in sync the way old mcp's
 LeadTools.buildLeadSearchFilter does for its own six callers.
 """
 
+import re
 from typing import Any
 
 from app.core.logging import get_logger
@@ -180,6 +181,66 @@ def total_count(payload: Any) -> int | None:
     return None
 
 
+_UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+
+def _is_uuid(val: Any) -> bool:
+    if not isinstance(val, str):
+        return False
+    v = val.strip()
+    if "user id:" in v.lower() or "id:" in v.lower():
+        return True
+    return bool(_UUID_RE.match(v))
+
+
+def _resolve_assigned_to(row: dict) -> str | None:
+    # 1. Direct name string fields on the lead row
+    for key in ("assignToName", "assignToUserName", "assignedToName", "assignedUserName", "primaryUserName"):
+        val = row.get(key)
+        if isinstance(val, str) and val.strip() and not _is_uuid(val):
+            return val.strip()
+
+    # 2. Objects under assignTo, primaryUser, assignedUser, user, etc.
+    for key in ("assignTo", "primaryUser", "assignedUser", "user"):
+        obj = row.get(key)
+        if isinstance(obj, dict):
+            name = obj.get("name") or obj.get("displayName") or obj.get("userName")
+            if not name and (obj.get("firstName") or obj.get("lastName")):
+                name = f"{obj.get('firstName') or ''} {obj.get('lastName') or ''}".strip()
+            if isinstance(name, str) and name.strip() and not _is_uuid(name):
+                return name.strip()
+
+    # 3. Users list on the row
+    users = row.get("users")
+    if isinstance(users, list) and users:
+        first = users[0]
+        if isinstance(first, dict):
+            name = first.get("name") or first.get("userName")
+            if not name and (first.get("firstName") or first.get("lastName")):
+                name = f"{first.get('firstName') or ''} {first.get('lastName') or ''}".strip()
+            if isinstance(name, str) and name.strip() and not _is_uuid(name):
+                return name.strip()
+        elif isinstance(first, str) and first.strip() and not _is_uuid(first):
+            return first.strip()
+
+    # 4. If assignTo / assignedTo is a raw UUID string, attempt to resolve via list_users()
+    raw_id = row.get("assignTo") or row.get("assignedTo")
+    if isinstance(raw_id, str) and raw_id.strip() and _is_uuid(raw_id):
+        try:
+            from app.integrations.crm.factory import get_crm_client
+            user_list = get_crm_client().list_users()
+            clean_id = raw_id.strip()
+            for u in user_list:
+                if u.id == clean_id:
+                    name = f"{u.first_name or ''} {u.last_name or ''}".strip() or u.user_name
+                    if name and not _is_uuid(name):
+                        return name
+        except Exception as exc:
+            log.debug("Could not resolve user ID '%s' to name: %s", raw_id, exc)
+
+    return None
+
+
 def to_lead(row: dict) -> Lead:
     """Map one Leadrat row onto our Lead model."""
     status = row.get("status") or {}
@@ -205,7 +266,7 @@ def to_lead(row: dict) -> Lead:
         location=location,
         project=projects[0].get("name") if projects else None,
         requirement=row.get("notes"),
-        assigned_to=row.get("assignTo"),
+        assigned_to=_resolve_assigned_to(row),
         scheduled_at=row.get("scheduledDate"),
         created_at=row.get("createdOn"),
         last_modified_at=row.get("lastModifiedOn"),
