@@ -86,30 +86,3 @@ class LeadratHttp:
             raise CRMError(f"Leadrat returned {resp.status_code}: {_message(resp)}")
 
         return resp.json()
-
-    def post(self, path: str, body: dict) -> Any:
-        url = f"{settings.leadrat_base_url}{path}"
-        log.info("POST %s body=%s", path, body)
-        try:
-            resp = httpx.post(
-                url, json=body, headers=self._request_headers(), timeout=settings.leadrat_timeout
-            )
-        except httpx.HTTPError as exc:
-            raise CRMError(f"Leadrat request failed: {exc}") from exc
-
-        return self._handle_response(path, resp)
-
-    def get(self, path: str, params: dict | None = None) -> Any:
-        url = f"{settings.leadrat_base_url}{path}"
-        log.info("GET %s params=%s", path, params)
-        try:
-            resp = httpx.get(
-                url,
-                params=params,
-                headers=self._request_headers(),
-                timeout=settings.leadrat_timeout,
-            )
-        except httpx.HTTPError as exc:
-            raise CRMError(f"Leadrat request failed: {exc}") from exc
-
-        return self._handle_response(path, resp)
