@@ -5,11 +5,17 @@ from app.core.jwt_claims import user_id as jwt_user_id
 from app.integrations.crm.leadrat.endpoints import (
     get_all_leads,
     get_all_users,
+    get_amenity_categories,
+    get_area_units,
     get_lead_history,
+    get_project_types,
+    get_property_types,
+    get_statuses,
     get_user_profile,
 )
 from app.integrations.crm.leadrat.http import LeadratHttp
 from app.schemas.lead import Lead, LeadFilters, LeadHistoryPage, LeadPage
+from app.schemas.masterdata import AmenityCategory, AreaUnit, LeadStatus, ProjectType, PropertyType
 from app.schemas.user import UserProfile, UserSummary
 
 
@@ -46,3 +52,18 @@ class LeadratClient:
 
     def list_users(self) -> list[UserSummary]:
         return get_all_users(self._http)
+
+    def list_property_types(self) -> list[PropertyType]:
+        return get_property_types(self._http)
+
+    def list_project_types(self) -> list[ProjectType]:
+        return get_project_types(self._http)
+
+    def list_area_units(self) -> list[AreaUnit]:
+        return get_area_units(self._http)
+
+    def list_statuses(self) -> list[LeadStatus]:
+        return get_statuses(self._http)
+
+    def list_amenity_categories(self) -> list[AmenityCategory]:
+        return get_amenity_categories(self._http)
