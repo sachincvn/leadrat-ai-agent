@@ -59,8 +59,12 @@ Llama 3.1+, Mistral). Without it the agent can only answer in plain text.
 ### 2. Start the backend
 
 ```bash
-python -m uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload --reload-include .env
 ```
+
+`--reload-include .env` matters: without it uvicorn watches only `.py` files, so a
+changed `.env` is ignored until you restart the process by hand. The `/health`
+response always shows which provider and CRM the **running** process actually uses.
 
 Activate the venv in every terminal first. If `uvicorn` alone says
 *"is not recognized"*, the venv is not active — either run `.venv\Scriptsctivate`,
@@ -218,6 +222,8 @@ Nothing lower imports something higher, so any layer can be replaced on its own.
 | The model never calls a tool | The chosen model does not support tool calling — switch models |
 | `401 unauthorized` | Missing or expired JWT — send `Authorization: Bearer <token>` |
 | `lead_not_found` on L001 | `USE_MOCK_CRM=false` while the live endpoints are still placeholders |
+| `.env` change had no effect | uvicorn was started before the edit — restart it, or run with `--reload-include .env` |
+| `/health` says `crm: mock` but `.env` says false | Same cause: the running process still holds the old settings |
 
 ---
 
