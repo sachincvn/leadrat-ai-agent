@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # llm
     llm_provider: str = "ollama"  # ollama | huggingface | local_hf
     llm_temperature: float = 0.1
-    llm_max_tokens: int = 800
+    llm_max_tokens: int = 1500
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen3:8b"
     hf_api_token: str = ""
@@ -30,9 +30,6 @@ class Settings(BaseSettings):
 
     # agent
     agent_max_steps: int = 3
-    # the assistant turn needs more room: read a tool, then act on the screen,
-    # then report back, all within one turn
-    assistant_max_steps: int = 8
 
     # crm - the caller's JWT and tenant arrive per request, never from here
     leadrat_base_url: str = "https://connect.leadrat.info/api/v1/mcp"
