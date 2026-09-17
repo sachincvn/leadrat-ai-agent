@@ -14,5 +14,6 @@ from langchain_core.tools import BaseTool
 
 from app.agent.tools.lead.get_lead import get_lead
 from app.agent.tools.lead.search_leads import search_leads
+from app.agent.tools.lead.search_leads_custom_filters import search_leads_custom_filters
 
-LEAD_TOOLS: list[BaseTool] = [get_lead, search_leads]
+LEAD_TOOLS: list[BaseTool] = [get_lead, search_leads, search_leads_custom_filters]

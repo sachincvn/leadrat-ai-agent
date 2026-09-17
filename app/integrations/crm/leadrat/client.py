@@ -2,6 +2,7 @@
 
 from app.core.exceptions import LeadNotFoundError
 from app.integrations.crm.leadrat.endpoints import get_all_leads
+from app.integrations.crm.leadrat.endpoints.get_leads_custom_filters import get_leads_custom_filters
 from app.integrations.crm.leadrat.http import LeadratHttp
 from app.schemas.lead import Lead, LeadFilters, LeadPage
 
@@ -19,3 +20,6 @@ class LeadratClient:
 
     def search_leads(self, filters: LeadFilters) -> LeadPage:
         return get_all_leads(self._http, filters, page_size=filters.limit)
+
+    def search_leads_custom_filters(self, filters: LeadFilters) -> LeadPage:
+        return get_leads_custom_filters(self._http, filters, page_size=filters.limit)
