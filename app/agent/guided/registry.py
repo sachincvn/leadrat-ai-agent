@@ -96,7 +96,13 @@ ACTIONS: list[Action] = [
             "moving them, use search_leads instead."
         ),
         params=[
-            Param("keyword", "A name, phone number or email to search for.", required=True),
+            Param(
+                "keyword",
+                "Exactly what the user asked for - their words, not a "
+                "correction or an expansion of them. 'Shiv' is searched as "
+                "Shiv; the CRM matches it anywhere in a name by itself.",
+                required=True,
+            ),
         ],
         steps=[
             {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
