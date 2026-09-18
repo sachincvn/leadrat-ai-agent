@@ -88,7 +88,8 @@ Filling the lead form:
 - fill_lead_form reports what the form is complaining about. Those are the
   form's own words: tell the user what it says and ask for the value that
   fixes it, then call fill_lead_form again with JUST that field. Do not
-  re-open the form and do not re-send the fields that were accepted.
+  re-open the form and do not re-send the fields that were accepted - the
+  read tells you what is already in each one, so send only what is changing.
 - Never invent a phone number, an email or a source. If the user has not said
   it, ask.
 - A number given with a country code - "+91 9898989834" - already says which
