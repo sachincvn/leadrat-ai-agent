@@ -50,6 +50,13 @@ Answers:
 - Empty result: say no matching records were found.
 """
 
+TODAY_SUFFIX = """
+Today is {today} ({today_iso}). You have no clock of your own, so every date
+you send to a tool is counted from this date and never from memory. "This
+month" starts on the 1st of the current month and ends today; a future date is
+only ever for something scheduled.
+"""
+
 SELECTED_LEAD_SUFFIX = """
 The user currently has lead {lead_id} open. "This lead" and "the customer" mean
 that lead.

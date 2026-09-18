@@ -1,0 +1,83 @@
+"""What "today" means to this server.
+
+An LLM has no clock. Asked for "leads created this week" it will happily emit
+ISO dates from around its training cutoff, and the CRM will answer honestly
+about a week in the past. So the current date is never left to the model: it is
+stated in the prompt every turn, and any relative word that still arrives in a
+tool call is resolved here.
+
+The zone is the one the CRM itself reports in (Asia/Calcutta, matching the
+`timeZoneId` on every lead request), not the server's local zone - a container
+running in UTC must not shift "today" by five and a half hours.
+"""
+
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
+
+CRM_TZ = ZoneInfo("Asia/Calcutta")
+
+
+def now() -> datetime:
+    return datetime.now(CRM_TZ)
+
+
+def today() -> date:
+    return now().date()
+
+
+def today_iso() -> str:
+    return today().isoformat()
+
+
+def describe_today() -> str:
+    """The one line of date context the model gets, e.g. "Thursday, 18 September 2026"."""
+    return now().strftime("%A, %d %B %Y")
+
+
+def _monday_of(day: date) -> date:
+    return day - timedelta(days=day.weekday())
+
+
+def _month_start(day: date) -> date:
+    return day.replace(day=1)
+
+
+def _previous_month_start(day: date) -> date:
+    return (_month_start(day) - timedelta(days=1)).replace(day=1)
+
+
+def resolve_relative_date(value: str) -> str | None:
+    """Turn a relative word into an ISO date, or None if it isn't one.
+
+    Only single days resolve here. A span ("last 7 days") is two different
+    dates depending on which end you ask for, so it is handled by the caller,
+    which knows whether it is filling from_date or to_date.
+    """
+    key = " ".join(value.strip().lower().replace("_", " ").split())
+    day = today()
+    singles: dict[str, date] = {
+        "today": day,
+        "now": day,
+        "yesterday": day - timedelta(days=1),
+        "tomorrow": day + timedelta(days=1),
+    }
+    return singles[key].isoformat() if key in singles else None
+
+
+def resolve_range(value: str) -> tuple[str, str] | None:
+    """Turn a relative span into (from_date, to_date), or None if it isn't one."""
+    key = " ".join(value.strip().lower().replace("_", " ").split())
+    day = today()
+
+    ranges: dict[str, tuple[date, date]] = {
+        "this week": (_monday_of(day), day),
+        "last week": (_monday_of(day) - timedelta(days=7), _monday_of(day) - timedelta(days=1)),
+        "this month": (_month_start(day), day),
+        "last month": (_previous_month_start(day), _month_start(day) - timedelta(days=1)),
+        "this year": (day.replace(month=1, day=1), day),
+        "last 7 days": (day - timedelta(days=6), day),
+        "last 30 days": (day - timedelta(days=29), day),
+        "last 90 days": (day - timedelta(days=89), day),
+    }
+    span = ranges.get(key)
+    return (span[0].isoformat(), span[1].isoformat()) if span else None

@@ -60,8 +60,18 @@ def total_count(payload: Any) -> int | None:
 
 
 def _named(value: Any) -> str | None:
+    """{"displayName": ...}, a bare string, or an enum serialized as its ordinal.
+
+    Which of the three arrives varies by endpoint, so an int is rendered rather
+    than rejected - the names behind these ordinals are not published anywhere
+    we can read, and a number in the answer beats a failed tool call.
+    """
     if isinstance(value, dict):
         return value.get("displayName") or value.get("name")
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, int):
+        return str(value)
     return value
 
 

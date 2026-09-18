@@ -59,10 +59,30 @@ def total_count(payload: Any) -> int | None:
     return None
 
 
-def _named(value: Any) -> str | None:
-    """Leadrat's enum-like fields come back as {"displayName": ..., ...} or a bare string."""
+# ProjectStatus as the Leadrat backend declares it, in ordinal order - the API
+# serializes these fields as either the name or the ordinal, and which one you
+# get varies by endpoint, so both have to be understood here.
+PROJECT_STATUS = [
+    "Unknown", "Upcoming", "Ongoing", "ReadyToMove", "New",
+    "Resale", "PreLaunch", "Launch", "OffPlan",
+]
+
+
+def _named(value: Any, names: list[str] | None = None) -> str | None:
+    """Leadrat's enum-like fields: {"displayName": ...}, a bare string, or an int.
+
+    `names` turns an ordinal into its name. Without it - or for an ordinal
+    outside the list - the number is rendered as a string rather than dropped,
+    so an enum the backend grew stays visible instead of silently vanishing.
+    """
     if isinstance(value, dict):
         return value.get("displayName") or value.get("name")
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, int):
+        if names and 0 <= value < len(names):
+            return names[value]
+        return str(value)
     return value
 
 
@@ -70,8 +90,8 @@ def to_project(row: dict) -> Project:
     return Project(
         id=str(row.get("id") or ""),
         name=row.get("name") or "Unknown",
-        status=_named(row.get("status")),
-        current_status=_named(row.get("currentStatus")),
+        status=_named(row.get("status"), PROJECT_STATUS),
+        current_status=_named(row.get("currentStatus"), PROJECT_STATUS),
         total_flats=row.get("totalFlats"),
         total_blocks=row.get("totalBlocks"),
         min_price=row.get("minimumPrice"),
