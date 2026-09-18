@@ -439,7 +439,6 @@ ACTIONS: list[Action] = [
             Param("status", "Lead status, as the tenant names it - check list_statuses."),
             Param("sub_status", "Sub-status under that status."),
             Param("source", "Where the leads came from, e.g. 99acres, Facebook."),
-            Param("city", "City."),
             Param("owner", "Who the leads are assigned to, by name."),
         ],
         steps=[
@@ -470,13 +469,6 @@ ACTIONS: list[Action] = [
                 "value": "{{source}}",
                 "optional": True,
                 "say": "Setting source to {{source}}",
-            },
-            {
-                "type": "select",
-                "target": "lead-filter.city",
-                "value": "{{city}}",
-                "optional": True,
-                "say": "Setting city to {{city}}",
             },
             {
                 "type": "select",

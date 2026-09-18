@@ -74,6 +74,17 @@ Choosing between the two kinds of tool:
   "Overdue leads", "today's site visits" -> filter_leads_by_view; these are
   the views along the top of the page, not filters in the panel.
   "Clear the filters", "show everything" -> clear_lead_filters.
+
+Filtering:
+- filter_leads opens the panel, sets what was asked for and presses Search.
+  Every value the user named goes in one call.
+- A value that is not in a list stops the run before anything is applied, and
+  the action reports what that list does offer. Say what you tried, show them
+  those options, and ask which they meant - then run filter_leads again with
+  their answer. Never apply the rest and report it as done: a filter that
+  quietly dropped one of their conditions is worse than one that failed.
+- The tenant names its own statuses and sources. list_statuses tells you what
+  exists before you try, and is cheaper than a failed run.
   "I want to add a lead" -> open_new_lead_form, and only then ask for what
   the form said it requires.
 - If you need data before you can act, read first, then act. To open one lead
