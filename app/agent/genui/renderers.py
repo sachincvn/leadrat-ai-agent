@@ -20,6 +20,7 @@ unexpected in a tool result costs the block, not the turn.
 import json
 import re
 from collections.abc import Callable
+from datetime import datetime
 from typing import Any
 
 from app.agent.genui.blocks import Block
@@ -123,6 +124,97 @@ def _count_of(value: Any, unit: str) -> str | None:
     return f"{value} {unit}" if value else None
 
 
+
+# ------------------------------------------------- lead history formatting
+
+_UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
+# Audit values arrive as raw API payloads, so the keys are the wire's names.
+# These are the ones worth showing, in the order they read best.
+HISTORY_FIELD_LABELS = (
+    ("Name", "Name"),
+    ("ProjectName", "Project"),
+    ("PropertyName", "Property"),
+    ("ExecutiveName", "Executive"),
+    ("ExecutiveContactNo", "Contact"),
+    ("Location", "Location"),
+    ("Status", "Status"),
+    ("SubStatus", "Sub-status"),
+    ("Remarks", "Remarks"),
+    ("Note", "Note"),
+    ("ScheduledOn", "Scheduled"),
+    ("AppointmentDate", "Appointment"),
+)
+MAX_HISTORY_DETAILS = 4
+
+
+def _readable_date(value: str) -> str:
+    """An ISO timestamp as a person would write it, or the value untouched."""
+    try:
+        moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (AttributeError, ValueError):
+        return value
+    return moment.strftime("%d %b %Y, %I:%M %p").lstrip("0").replace(" 0", " ")
+
+
+def _readable_value(value: Any) -> str | None:
+    """One audit value, or None when there is nothing worth showing."""
+    if value in (None, "", [], {}):
+        return None
+    text = str(value).strip()
+    if not text or text.lower() in ("null", "none"):
+        return None
+    # An id is what the audit trail stores instead of a name; it means nothing
+    # to the person reading it.
+    if _UUID_RE.match(text):
+        return None
+    if len(text) > 18 and text[:4].isdigit() and "-" in text:
+        return _readable_date(text)
+    return text
+
+
+def _describe_change(raw: str | None) -> str:
+    """A change as a sentence, out of whatever the audit trail stored.
+
+    Leadrat records some changes as a label and a JSON snapshot of the whole
+    record - mostly nulls, ids and timestamps. Rendered as-is it is a wall of
+    `"ProjectName":null`. This keeps the handful of fields that were actually
+    filled in, under names a person recognises.
+    """
+    if not raw:
+        return ""
+
+    text = str(raw).strip()
+    start = text.find("{")
+    if start == -1:
+        return _readable_value(text) or ""
+
+    label = text[:start].strip(" -:")
+    try:
+        payload = json.loads(text[start:])
+    except ValueError:
+        return label or ""
+
+    if not isinstance(payload, dict):
+        return label or ""
+
+    parts = []
+    for key, display in HISTORY_FIELD_LABELS:
+        value = _readable_value(payload.get(key))
+        if value:
+            parts.append(f"{display}: {value}")
+        if len(parts) == MAX_HISTORY_DETAILS:
+            break
+
+    if not parts:
+        # Nothing in the snapshot was filled in - the label is the whole story.
+        return label
+    detail = ", ".join(parts)
+    return f"{label} - {detail}" if label else detail
+
+
 # ---------------------------------------------------------------- renderers
 
 
@@ -199,19 +291,32 @@ def _history(data: dict) -> list[Block]:
     """
     entries = []
     for entry in data.get("history", []):
-        field = entry.get("field_name") or entry.get("action_type") or "Updated"
-        old, new = entry.get("old_value"), entry.get("new_value")
-        if old and new:
+        old = _describe_change(entry.get("old_value"))
+        new = _describe_change(entry.get("new_value"))
+
+        # "Status" is a better headline than "Lead" when the API labels the
+        # row by the record rather than the field that moved.
+        field = entry.get("field_name") or ""
+        category = entry.get("category") or ""
+        title = category if field.lower() in ("", "lead") and category else field
+        title = title or entry.get("action_type") or "Updated"
+
+        if old and new and old != new:
             detail = f"{old} → {new}"
         else:
-            detail = new or old or ""
+            detail = new or old
+
+        # A snapshot with nothing filled in describes itself as its own label,
+        # which the headline already says.
+        if detail == title:
+            detail = ""
 
         entries.append(
             {
-                "title": field,
+                "title": title,
                 "detail": detail,
                 "by": entry.get("updated_by"),
-                "at": entry.get("updated_at"),
+                "at": _readable_date(entry.get("updated_at") or ""),
             }
         )
 
