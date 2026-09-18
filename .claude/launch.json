@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--reload", "--reload-dir", "app", "--reload-include", ".env"],
+      "port": 8000
+    },
+    {
+      "name": "ui",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "streamlit", "run", "ui/app.py"],
+      "port": 8501
+    }
+  ]
+}
