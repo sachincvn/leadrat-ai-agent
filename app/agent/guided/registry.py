@@ -155,6 +155,13 @@ ACTIONS: list[Action] = [
             ),
             Param("email", "Email address."),
             Param("source", "Where the lead came from, e.g. Referral, Walk In."),
+            Param(
+                "country",
+                "The phone number's country, by name - 'India', 'United Arab "
+                "Emirates'. The form defaults to one country and rejects a "
+                "number that does not match it, so pass this whenever the "
+                "user names a country or their number is rejected.",
+            ),
         ],
         steps=[
             {
@@ -163,6 +170,13 @@ ACTIONS: list[Action] = [
                 "value": "{{name}}",
                 "optional": True,
                 "say": "Typing the name",
+            },
+            {
+                "type": "selectCountry",
+                "target": "lead-form.phone",
+                "value": "{{country}}",
+                "optional": True,
+                "say": "Setting the country to {{country}}",
             },
             {
                 "type": "fill",

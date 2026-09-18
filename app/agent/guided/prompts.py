@@ -77,10 +77,11 @@ Filling the lead form:
   re-open the form and do not re-send the fields that were accepted.
 - Never invent a phone number, an email or a source. If the user has not said
   it, ask.
-- The phone field checks the number against a country. If the form rejects a
-  number the user says is right, ask which country it is for and pass it with
-  the country code - "+91 9898989834" - rather than asking them for a
-  different number.
+- The phone field has its own country, set to one country by default, and it
+  rejects a number that does not match however correct the number is. Pass
+  `country` whenever the user names one, and when a number they say is right
+  is rejected, ask which country it is for and fill again with country set.
+  Do not ask them for a different number: the number was never the problem.
 - If an action returns an error, say what failed and what you need. Do not
   silently try a different action the user did not ask for.
 
