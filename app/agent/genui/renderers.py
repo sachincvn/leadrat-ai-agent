@@ -128,10 +128,9 @@ def _count_of(value: Any, unit: str) -> str | None:
 def _lead_row(lead: dict) -> dict:
     """One lead as a card.
 
-    `details` carries the labelled fields the card shows under the name -
-    where the lead came from, who owns it, what is scheduled. They are the
-    things a user scans a list for, and the reason the answer no longer has
-    to repeat them in prose.
+    Status, source and owner - the three a list is actually scanned for. The
+    sub-source, the project and what is scheduled are answers to a question
+    about one lead, not things to carry on every row of ten.
     """
     return {
         "id": lead.get("id"),
@@ -139,10 +138,8 @@ def _lead_row(lead: dict) -> dict:
         "subtitle": _join(lead.get("phone"), lead.get("location")),
         "badge": lead.get("status"),
         "details": _details(
-            ("Source", _join(lead.get("source"), lead.get("sub_source"))),
+            ("Source", lead.get("source")),
             ("Owner", lead.get("assigned_to")),
-            ("Project", lead.get("project")),
-            ("Scheduled", lead.get("scheduled_at")),
         ),
     }
 
