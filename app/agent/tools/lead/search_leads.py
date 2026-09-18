@@ -47,6 +47,24 @@ def _compact(lead: Lead) -> dict:
     return {key: data[key] for key in SAMPLE_FIELDS if data.get(key)}
 
 
+def _unique(leads: list[Lead]) -> list[Lead]:
+    """One row per lead.
+
+    Leadrat returns a lead once per owner it matched on, so a lead with a
+    primary and a secondary owner comes back twice - same name, same phone,
+    different owner. Shown as-is it reads as duplicate data in the CRM. The
+    first row wins, which is the primary owner's.
+    """
+    seen: set[str] = set()
+    unique: list[Lead] = []
+    for lead in leads:
+        if lead.id in seen:
+            continue
+        seen.add(lead.id)
+        unique.append(lead)
+    return unique
+
+
 @tool
 def search_leads(
     keyword: str = "",
@@ -131,8 +149,13 @@ def search_leads(
     furnished: Furnished|Semifurnished|Unfurnished.
     professions: Salaried|Business|SelfEmployed|Doctor|Retired|Housewife|
       Student|Unemployed|Others.
-    meeting_or_visit_statuses: IsMeetingDone|IsMeetingNotDone|IsSiteVisitDone|
-      IsSiteVisitNotDone.
+    meeting_or_visit_statuses: whether a meeting or site visit has ALREADY
+      HAPPENED - IsMeetingDone|IsMeetingNotDone|IsSiteVisitDone|
+      IsSiteVisitNotDone. Never use these for "scheduled": a lead with a visit
+      booked for next week is IsSiteVisitNotDone, and so is every lead that
+      never had one. "Site visit scheduled" / "meeting scheduled" is a lead
+      STATUS - check list_statuses and pass status_names. For "scheduled this
+      week" add a date_filters entry with date_type="ScheduledDate".
     company_name, referral_name, campaign_names, utm_sources.
     is_with_team: true to include the team's leads.
     """
@@ -177,13 +200,14 @@ def search_leads(
         utm_sources=utm_sources,
     )
     result = get_crm_client().search_leads(filters)
+    leads = _unique(result.leads)
 
     return json.dumps(
         {
             "total_matching_leads": result.total,
             "page": page,
-            "showing": len(result.leads),
-            "leads": [_compact(lead) for lead in result.leads],
+            "showing": len(leads),
+            "leads": [_compact(lead) for lead in leads],
         },
         default=str,
     )

@@ -35,6 +35,11 @@ Routing:
   A report's columns differ per tenant: read the names off the rows returned.
 - Before filtering on a status, property type, project type, area unit or
   amenity, call the matching list_* tool to see the tenant's real values.
+- "Site visit scheduled", "meeting scheduled", "callback" and the like are
+  STATUSES, not the meeting/visit flags: look them up with list_statuses and
+  pass status_names. meeting_or_visit_statuses only says whether one already
+  happened, so IsSiteVisitNotDone matches every lead that never had a visit
+  booked at all.
 
 Filters:
 - Pass only values the user stated. Never invent one.
