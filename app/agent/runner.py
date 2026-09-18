@@ -96,10 +96,17 @@ def _build_messages(
     return messages
 
 
-def _run_tool(call: dict) -> str:
-    """One tool call, with a failure fed back to the model rather than raised."""
+def _run_tool(call: dict, failures: list[str] | None = None) -> str:
+    """One tool call, with a failure fed back to the model rather than raised.
+
+    `failures` collects the reason for each failed call so that a turn which
+    runs out of steps can say what actually went wrong instead of blaming the
+    step limit, which tells the user nothing they can act on.
+    """
     tool = TOOLS_BY_NAME.get(call["name"])
     if tool is None:
+        if failures is not None:
+            failures.append(f"unknown tool {call['name']}")
         return f"Unknown tool: {call['name']}"
 
     log.info("tool call: %s %s", call["name"], call["args"])
@@ -112,6 +119,8 @@ def _run_tool(call: dict) -> str:
         # instead, so the model gets a chance to recover - retry with a real
         # id, search by name first, or ask the user - in its next step.
         log.warning("tool call failed: %s %s (%s)", call["name"], call["args"], exc)
+        if failures is not None:
+            failures.append(str(exc))
         return (
             f"That call to {call['name']} failed: {exc}. "
             "If a required value was missing or guessed, get the real "
@@ -130,6 +139,7 @@ def run_agent(
 
     tools_used: list[str] = []
     tool_notes: list[str] = []
+    failures: list[str] = []
 
     for _ in range(settings.agent_max_steps):
         try:
@@ -153,13 +163,33 @@ def run_agent(
 
         messages.append(reply)
         for call in tool_calls:
-            output = _run_tool(call)
+            output = _run_tool(call, failures)
             if call["name"] in TOOLS_BY_NAME:
                 tools_used.append(call["name"])
             messages.append(ToolMessage(content=output, tool_call_id=call["id"]))
             tool_notes.append(f"{call['name']} -> {output[:TOOL_NOTE_CHARS]}")
 
-    return AgentResult("I could not finish that within the step limit.", tools_used, tool_notes)
+    return AgentResult(_incomplete_answer(failures), tools_used, tool_notes)
+
+
+STEP_LIMIT_MESSAGE = (
+    "I could not finish that - I ran out of steps before I had an answer."
+)
+
+
+def _incomplete_answer(failures: list[str]) -> str:
+    """What to say when the loop ends with no answer.
+
+    A bare "step limit" line reads like the assistant gave up for no reason. If
+    the steps were spent on calls the CRM rejected, the last rejection is the
+    honest explanation, and the only one the user could act on.
+    """
+    if not failures:
+        return STEP_LIMIT_MESSAGE
+    return (
+        "I could not complete that - the CRM rejected the request. "
+        f"Last error: {failures[-1]}"
+    )
 
 
 # ---------------------------------------------------------------- streaming
@@ -197,6 +227,7 @@ def stream_agent(
 
     tools_used: list[str] = []
     tool_notes: list[str] = []
+    failures: list[str] = []
 
     for _ in range(settings.agent_max_steps):
         safe = SafeAnswerStream()
@@ -245,7 +276,7 @@ def stream_agent(
         messages.append(reply)
         for call in tool_calls:
             yield StreamEvent("status", tool=call["name"])
-            output = _run_tool(call)
+            output = _run_tool(call, failures)
             if call["name"] in TOOLS_BY_NAME:
                 tools_used.append(call["name"])
             messages.append(ToolMessage(content=output, tool_call_id=call["id"]))
@@ -256,6 +287,6 @@ def stream_agent(
             for block in render_blocks(call["name"], output):
                 yield StreamEvent("block", name=block.name, props=block.props)
 
-    answer = "I could not finish that within the step limit."
+    answer = _incomplete_answer(failures)
     yield StreamEvent("text", text=answer)
     yield StreamEvent("done", answer=answer, tools_used=tools_used, tool_notes=tool_notes)
