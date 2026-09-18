@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     # The guided loop needs more room than chat: a plan the browser runs comes
     # back as another turn, so reading the screen and then acting on what it
     # says is two steps before the model has answered anything.
-    assistant_max_steps: int = 8
+    assistant_max_steps: int = 14
 
     # crm - the caller's JWT and tenant arrive per request, never from here
     leadrat_base_url: str = "https://connect.leadrat.info/api/v1/mcp"

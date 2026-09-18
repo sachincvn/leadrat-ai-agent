@@ -184,9 +184,18 @@ def run_turn(request: AssistantTurnRequest) -> AssistantTurnResponse:
         messages += [ToolMessage(content=r.content, tool_call_id=r.id) for r in server_results]
         appended.append(TranscriptEntry(role="tool", results=server_results))
 
+    # Out of steps. Saying so and stopping tells the user nothing they can act
+    # on, so the answer names what was actually being done - and the log
+    # carries it, because a turn that runs this long is usually a loop.
+    log.warning("assistant turn hit the step limit after tools: %s", tools_used)
+    tried = ", ".join(dict.fromkeys(tools_used)) or "nothing"
     return AssistantTurnResponse(
         type="message",
-        text="I could not finish that within the step limit.",
+        text=(
+            f"I got stuck part way through that - I tried {tried} and did not "
+            "get to the end. Nothing was left half done on screen. Try asking "
+            "for the one thing you want changed."
+        ),
         tools_used=tools_used,
         history_append=appended,
     )
