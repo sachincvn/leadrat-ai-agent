@@ -97,7 +97,7 @@ def build_body(filters: LeadFilters, page: int = 1, page_size: int = DEFAULT_PAG
             {
                 "multiDateType": d.date_type,
                 "multiFromDate": to_utc_instant(d.from_date),
-                "multiToDate": to_utc_instant(d.to_date),
+                "multiToDate": to_utc_instant(d.to_date, end_of_day=True),
             }
             for d in filters.date_filters
         ]

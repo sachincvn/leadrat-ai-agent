@@ -45,7 +45,7 @@ def build_body(filters: ReportFilters) -> dict[str, Any]:
             {
                 "multiDateType": d.date_type,
                 "multiFromDate": to_utc_instant(d.from_date),
-                "multiToDate": to_utc_instant(d.to_date),
+                "multiToDate": to_utc_instant(d.to_date, end_of_day=True),
             }
             for d in filters.dates
         ]
