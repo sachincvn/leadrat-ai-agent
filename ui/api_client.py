@@ -76,6 +76,20 @@ def clear_chat_history(jwt: str, tenant: str) -> dict:
     return _check(resp)
 
 
+def lead_chat(lead_id: str, message: str | None, jwt: str, tenant: str) -> dict:
+    """One stateless turn about a single lead - no conversation id, no history kept.
+
+    message=None asks the backend for its default: a summary of the lead.
+    """
+    resp = requests.post(
+        f"{BASE}/leads/{lead_id}/chat",
+        json={"message": message} if message else {},
+        headers=_headers(jwt, tenant),
+        timeout=REQUEST_TIMEOUT,
+    )
+    return _check(resp)
+
+
 def search_leads(jwt: str, tenant: str, limit: int = 5) -> dict:
     resp = requests.get(
         f"{BASE}/leads/search",
