@@ -34,6 +34,9 @@ PAGES = (
     "settings",
     "profile",
 )
+# The chips along the top of the leads page, by their own labels.
+QUICK_FILTERS = ("New", "Today", "Overdue", "Pending", "Booked", "Site visits", "Meetings")
+
 READABLE = (
     "visible_leads",
     "current_page",
@@ -415,6 +418,110 @@ ACTIONS: list[Action] = [
                 "key": "integration_form",
                 "say": "Checking the result",
             },
+        ],
+    ),
+    Action(
+        name="filter_leads",
+        description=(
+            "Filter the leads list on screen. Opens the filter panel, sets "
+            "whatever the user asked for and applies it, then reports the rows "
+            "that came back. Pass every filter they named in one call - this "
+            "is for 'show me interested leads from 99acres in Pune assigned to "
+            "Abid', not one field at a time."
+        ),
+        params=[
+            Param("status", "Lead status, as the tenant names it - check list_statuses."),
+            Param("sub_status", "Sub-status under that status."),
+            Param("source", "Where the leads came from, e.g. 99acres, Facebook."),
+            Param("city", "City."),
+            Param("owner", "Who the leads are assigned to, by name."),
+        ],
+        steps=[
+            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
+            {"type": "click", "target": "leads.filters", "say": "Opening the filters"},
+            {
+                "type": "waitFor",
+                "target": "lead-filter.apply",
+                "say": "Waiting for the filter panel",
+            },
+            {
+                "type": "select",
+                "target": "lead-filter.status",
+                "value": "{{status}}",
+                "optional": True,
+                "say": "Setting status to {{status}}",
+            },
+            {
+                "type": "select",
+                "target": "lead-filter.sub-status",
+                "value": "{{sub_status}}",
+                "optional": True,
+                "say": "Setting sub-status to {{sub_status}}",
+            },
+            {
+                "type": "select",
+                "target": "lead-filter.source",
+                "value": "{{source}}",
+                "optional": True,
+                "say": "Setting source to {{source}}",
+            },
+            {
+                "type": "select",
+                "target": "lead-filter.city",
+                "value": "{{city}}",
+                "optional": True,
+                "say": "Setting city to {{city}}",
+            },
+            {
+                "type": "select",
+                "target": "lead-filter.owner",
+                "value": "{{owner}}",
+                "optional": True,
+                "say": "Assigning filter to {{owner}}",
+            },
+            {"type": "click", "target": "lead-filter.apply", "say": "Applying the filters"},
+            {"type": "readState", "key": "visible_leads", "say": "Reading what came back"},
+        ],
+    ),
+    Action(
+        name="filter_leads_by_view",
+        description=(
+            "Switch the leads list to one of the views along the top of the "
+            "page - New, Today, Overdue, Pending, Booked, Site visits, "
+            "Meetings. Use this for 'show me overdue leads' or 'what site "
+            "visits are there', which are views rather than filters."
+        ),
+        params=[
+            Param("view", "Which view to switch to.", required=True, enum=QUICK_FILTERS),
+        ],
+        steps=[
+            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
+            {
+                "type": "click",
+                "target": "leads.quick-filter.{{view}}",
+                "say": "Switching to {{view}}",
+            },
+            {"type": "readState", "key": "visible_leads", "say": "Reading what came back"},
+        ],
+    ),
+    Action(
+        name="clear_lead_filters",
+        description=(
+            "Clear every filter on the leads list and show the full list "
+            "again. Use this for 'clear the filters', 'start again', 'show me "
+            "everything'."
+        ),
+        params=[],
+        steps=[
+            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
+            {"type": "click", "target": "leads.filters", "say": "Opening the filters"},
+            {
+                "type": "waitFor",
+                "target": "lead-filter.reset",
+                "say": "Waiting for the filter panel",
+            },
+            {"type": "click", "target": "lead-filter.reset", "say": "Clearing every filter"},
+            {"type": "readState", "key": "visible_leads", "say": "Reading the full list"},
         ],
     ),
     Action(
