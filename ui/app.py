@@ -81,6 +81,26 @@ with st.sidebar:
     except Exception as exc:
         st.error(f"Backend unreachable - {exc}")
 
+    st.divider()
+    st.caption("Single-lead chat (stateless - no conversation id)")
+    test_lead_id = st.text_input("Lead id", value="L001")
+    test_lead_message = st.text_input(
+        "Question (optional - leave blank for an automatic summary)", value=""
+    )
+    if st.button("Test lead chat"):
+        if not jwt:
+            st.warning("Paste your Leadrat JWT above first.")
+        else:
+            try:
+                result = api_client.lead_chat(
+                    test_lead_id, test_lead_message or None, jwt, tenant
+                )
+                st.write(result["Message"])
+                for point in result.get("KeyHighlights", []):
+                    st.markdown(f"- {point}")
+            except Exception as exc:
+                st.error(str(exc))
+
     if st.button("Clear chat"):
         # The backend remembers this conversation server-side (keyed off the
         # caller's JWT) - clear it there too, or the next message would still
