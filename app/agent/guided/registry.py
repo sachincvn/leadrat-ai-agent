@@ -439,7 +439,12 @@ ACTIONS: list[Action] = [
             Param("status", "Lead status, as the tenant names it - check list_statuses."),
             Param("sub_status", "Sub-status under that status."),
             Param("source", "Where the leads came from, e.g. 99acres, Facebook."),
-            Param("owner", "Who the leads are assigned to, by name."),
+            Param(
+                "owner",
+                "Who the leads are assigned to. Pass the name the user said - "
+                "the panel matches it against the list itself, so a first name "
+                "is enough and looking it up first is not needed.",
+            ),
         ],
         steps=[
             {"type": "navigate", "to": "leads", "say": "Leads, in the menu on the left"},

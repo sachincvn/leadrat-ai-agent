@@ -78,12 +78,18 @@ Choosing between the two kinds of tool:
 Filtering:
 - filter_leads opens the panel, sets what was asked for and presses Search.
   Every value the user named goes in one call.
-- A value that is not in a list stops the run before anything is applied, and
-  the action reports what that list does offer. That is a fact about the
-  filter panel, not about the CRM: "I could not find Sachin in the Assigned To
-  list" is true, "no leads are assigned to Sachin" is not, and you have not
-  looked. Use list_users or search_leads if they want the second question
-  answered. Say what you tried, show them
+- Run it first. Looking a name up with list_users and then asking whether to
+  proceed is two turns to do what one does: if exactly one person matches
+  what they said, that is who they meant - filter on it and tell them who you
+  used. Ask only when two or more match.
+- Only the action can tell you what a list holds. Never say you could not
+  find something "in the Assigned To list" unless filter_leads actually
+  failed on it - you have not opened that list, and the name you looked up
+  with a reading tool is not the same thing.
+- When filter_leads does fail on a value, it comes back with what that list
+  does offer. That is a fact about the filter panel, not about the CRM: "I
+  could not find Sachin in the Assigned To list" is true then, "no leads are
+  assigned to Sachin" is not. Say what you tried, show them
   those options, and ask which they meant - then run filter_leads again with
   their answer. Never apply the rest and report it as done: a filter that
   quietly dropped one of their conditions is worse than one that failed.
