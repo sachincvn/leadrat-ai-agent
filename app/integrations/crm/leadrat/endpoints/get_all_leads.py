@@ -45,7 +45,7 @@ def build_body(filters: LeadFilters, page: int = 1, page_size: int = DEFAULT_PAG
         "path": PATH.lstrip("/"),
         "pageNumber": max(page, 1),
         "pageSize": min(page_size if page_size > 0 else DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
-        "CanAccessAllLeads": True,
+        "CanAccessAllLeads": bool(filters.can_access_all_leads),
     }
 
     # Optional filters. Omitted entirely when unset - never sent as "" or null.
