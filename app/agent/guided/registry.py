@@ -34,7 +34,13 @@ PAGES = (
     "settings",
     "profile",
 )
-READABLE = ("visible_leads", "current_page", "lead_form", "lead_saved")
+READABLE = (
+    "visible_leads",
+    "current_page",
+    "lead_form",
+    "lead_saved",
+    "integration_form",
+)
 
 
 @dataclass(frozen=True)
@@ -241,6 +247,125 @@ ACTIONS: list[Action] = [
             # The click starts the request; this waits for it to finish and
             # says whether it did, rather than reading the form back mid-save.
             {"type": "readState", "key": "lead_saved", "say": "Waiting for the save"},
+        ],
+    ),
+    Action(
+        name="open_integration",
+        description=(
+            "Open the setup page for a lead-source integration - 99acres, "
+            "Magicbricks, Housing, Facebook and the rest of the cards on the "
+            "settings page - and click Add Account so the account form is "
+            "ready. Use this when the user wants to connect or set up a "
+            "portal. Then use fill_integration_form."
+        ),
+        params=[
+            Param(
+                "partner",
+                "The integration as the card names it: '99acres', "
+                "'Magicbricks', 'Housing', 'Facebook'.",
+                required=True,
+            ),
+        ],
+        steps=[
+            {"type": "navigate", "to": "settings", "say": "Opening settings"},
+            {
+                "type": "click",
+                "target": "integration.{{partner}}",
+                "say": "Opening {{partner}}",
+            },
+            {
+                "type": "click",
+                "target": "integration.add-account",
+                "say": "Clicking Add Account",
+            },
+            {
+                "type": "waitFor",
+                "target": "integration-form.account-name",
+                "say": "Waiting for the account form",
+            },
+            {
+                "type": "readState",
+                "key": "integration_form",
+                "say": "Checking what the form needs",
+            },
+        ],
+    ),
+    Action(
+        name="fill_integration_form",
+        description=(
+            "Type into the integration account form that is already open. "
+            "Account name and the relationship manager's email are required by "
+            "the form; the login id is optional. Pass only what the user gave "
+            "you - anything left out is left alone, so this can be called "
+            "again to fix one field. It reports what the form is complaining "
+            "about. It does not submit."
+        ),
+        params=[
+            Param("account_name", "A name for this account, e.g. the agency's name."),
+            Param("login_email", "The login id or email used with the portal."),
+            Param(
+                "manager_email",
+                "The portal relationship manager's email. This is who the "
+                "integration details are sent to.",
+            ),
+        ],
+        steps=[
+            {
+                "type": "fill",
+                "target": "integration-form.account-name",
+                "value": "{{account_name}}",
+                "optional": True,
+                "say": "Typing the account name",
+            },
+            {
+                "type": "fill",
+                "target": "integration-form.login-email",
+                "value": "{{login_email}}",
+                "optional": True,
+                "say": "Typing the login id",
+            },
+            {
+                "type": "fill",
+                "target": "integration-form.manager-email",
+                "value": "{{manager_email}}",
+                "submit": True,
+                "optional": True,
+                "say": "Adding the relationship manager's email",
+            },
+            {
+                "type": "readState",
+                "key": "integration_form",
+                "say": "Checking the form",
+            },
+        ],
+    ),
+    Action(
+        name="submit_integration_form",
+        description=(
+            "Submit the integration account form. This sends the integration "
+            "details to the relationship manager's email, so the user confirms "
+            "first. Once it is through, tell them what happens next: the "
+            "portal's relationship manager has to wire it up at their end, and "
+            "leads start arriving in the CRM once they do."
+        ),
+        params=[],
+        writes_to_crm=True,
+        steps=[
+            {
+                "type": "confirm",
+                "message": "Send these integration details to the relationship manager?",
+                "say": "Asking you to confirm",
+            },
+            {
+                "type": "click",
+                "target": "integration-form.submit",
+                "say": "Submitting the account",
+            },
+            {
+                "type": "readState",
+                "key": "integration_form",
+                "say": "Checking the result",
+            },
         ],
     ),
     Action(
