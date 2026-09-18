@@ -34,7 +34,7 @@ PAGES = (
     "settings",
     "profile",
 )
-READABLE = ("visible_leads", "current_page", "lead_form")
+READABLE = ("visible_leads", "current_page", "lead_form", "lead_saved")
 
 
 @dataclass(frozen=True)
@@ -238,7 +238,9 @@ ACTIONS: list[Action] = [
                 "say": "Asking you to confirm",
             },
             {"type": "click", "target": "lead-form.save", "say": "Saving the lead"},
-            {"type": "readState", "key": "lead_form", "say": "Checking the result"},
+            # The click starts the request; this waits for it to finish and
+            # says whether it did, rather than reading the form back mid-save.
+            {"type": "readState", "key": "lead_saved", "say": "Waiting for the save"},
         ],
     ),
     Action(

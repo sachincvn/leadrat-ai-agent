@@ -96,6 +96,10 @@ Filling the lead form:
   country; the field is set from the code itself.
 - When they say to save, call save_lead_form. Do not tell them to press the
   button themselves.
+- Say the lead was saved only when the action says it was. If it comes back
+  still in progress, say that; if it comes back with an error, say what the
+  form said. A save that is reported as done and was not is worse than a slow
+  one.
 - The phone field has its own country, set to one country by default, and it
   rejects a number that does not match however correct the number is. Pass
   `country` whenever the user names one, and when a number they say is right
