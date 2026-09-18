@@ -1,5 +1,6 @@
 """The agent loop: ask the model, run any tool it requests, ask again, answer."""
 
+import json
 import re
 from collections.abc import Iterator
 
@@ -54,6 +55,17 @@ _UNCLOSED_THINK_RE = re.compile(r"<think>.*\Z", re.DOTALL | re.IGNORECASE)
 # How much of one tool result is carried into the next turn. Enough to keep
 # ids and names resolvable, small enough not to grow the prompt unchecked.
 TOOL_NOTE_CHARS = 700
+
+# How much of one tool call's arguments is carried with it. The arguments are
+# what a follow-up narrows - "show me the new ones" means the previous filter
+# plus a status - so the next turn cannot reproduce the result without them.
+TOOL_ARGS_CHARS = 400
+
+
+def _tool_note(call: dict, output: str) -> str:
+    """One line of "what was asked, and what came back"."""
+    args = json.dumps(call.get("args") or {}, default=str)[:TOOL_ARGS_CHARS]
+    return f"{call['name']}({args}) -> {output[:TOOL_NOTE_CHARS]}"
 
 
 def strip_thinking(content: str) -> str:
@@ -171,7 +183,7 @@ def run_agent(
             if call["name"] in TOOLS_BY_NAME:
                 tools_used.append(call["name"])
             messages.append(ToolMessage(content=output, tool_call_id=call["id"]))
-            tool_notes.append(f"{call['name']} -> {output[:TOOL_NOTE_CHARS]}")
+            tool_notes.append(_tool_note(call, output))
 
     return AgentResult(_incomplete_answer(failures), tools_used, tool_notes)
 
@@ -287,7 +299,7 @@ def stream_agent(
             if call["name"] in TOOLS_BY_NAME:
                 tools_used.append(call["name"])
             messages.append(ToolMessage(content=output, tool_call_id=call["id"]))
-            tool_notes.append(f"{call['name']} -> {output[:TOOL_NOTE_CHARS]}")
+            tool_notes.append(_tool_note(call, output))
             # The data is on screen before the model has finished describing
             # it, and it is the tool's own output - not something the model
             # re-typed, and so not something it can get wrong.
