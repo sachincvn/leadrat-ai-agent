@@ -7,6 +7,7 @@ automatically from the caller's own token.
 
 import base64
 import json
+from datetime import datetime, timezone
 from uuid import UUID
 
 from app.core.logging import get_logger
@@ -74,3 +75,32 @@ def user_name(token: str) -> str | None:
         if isinstance(value, str) and value.strip() and not _is_guid(value):
             return value.strip()
     return None
+
+
+def expires_at(token: str) -> datetime | None:
+    """When the token stops being valid, from its `exp` claim."""
+    exp = decode_claims(token).get("exp")
+    if not isinstance(exp, (int, float)):
+        return None
+    try:
+        return datetime.fromtimestamp(exp, tz=timezone.utc)
+    except (OverflowError, OSError, ValueError):
+        return None
+
+
+def describe_expiry(token: str) -> str:
+    """A short, log-safe account of the token's lifetime.
+
+    Worth its own line whenever the CRM rejects a call: "expired 4 minutes ago"
+    and "valid for another 20 minutes" point at completely different problems,
+    and guessing between them has already cost an afternoon.
+    """
+    expiry = expires_at(token)
+    if expiry is None:
+        return "no exp claim"
+
+    seconds = (expiry - datetime.now(timezone.utc)).total_seconds()
+    minutes = abs(seconds) / 60
+    if seconds < 0:
+        return f"expired {minutes:.0f} min ago (exp {expiry:%Y-%m-%d %H:%M:%S} UTC)"
+    return f"valid for another {minutes:.0f} min (exp {expiry:%Y-%m-%d %H:%M:%S} UTC)"

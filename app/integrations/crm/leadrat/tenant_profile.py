@@ -16,9 +16,7 @@ token, so the cache lives in a ContextVar with the token itself rather than in
 a module global that would leak one caller's tenant into another's request.
 """
 
-from contextvars import ContextVar
-from typing import Any
-
+from app.core.context import request_cache
 from app.core.logging import get_logger
 
 log = get_logger(__name__)
@@ -37,17 +35,6 @@ REPORT_ALL_USERS = 0
 REPORT_REPORTEES = 1
 REPORT_NONE = -1
 
-_cache: ContextVar[dict[str, Any] | None] = ContextVar("leadrat_tenant_profile", default=None)
-
-
-def _store() -> dict[str, Any]:
-    current = _cache.get()
-    if current is None:
-        current = {}
-        _cache.set(current)
-    return current
-
-
 def cached(key: str, produce):
     """Call `produce` once per request for this key; reuse the answer after.
 
@@ -56,7 +43,7 @@ def cached(key: str, produce):
     retrying it on every endpoint call would multiply one outage by the number
     of tools the model runs.
     """
-    store = _store()
+    store = request_cache()
     if key not in store:
         store[key] = produce()
     return store[key]
@@ -64,4 +51,4 @@ def cached(key: str, produce):
 
 def reset() -> None:
     """Forget everything cached for the current request."""
-    _cache.set({})
+    request_cache().clear()

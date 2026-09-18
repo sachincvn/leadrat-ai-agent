@@ -11,6 +11,7 @@ import httpx
 
 from app.core.config import settings
 from app.core.exceptions import AuthError, CRMError
+from app.core.jwt_claims import describe_expiry
 from app.core.logging import get_logger
 
 log = get_logger(__name__)
@@ -46,6 +47,7 @@ class LeadratHttp:
         if not tenant:
             raise AuthError("No Leadrat tenant available for this request")
 
+        self.jwt = jwt
         self.headers = {
             "Authorization": f"Bearer {jwt}",
             "tenant": tenant,
@@ -74,6 +76,17 @@ class LeadratHttp:
             raise CRMError(f"Leadrat request failed: {exc}") from exc
 
         if resp.status_code in (401, 403):
+            # Which of the two it is matters: an expired token is the user's to
+            # refresh, a permission is not. The token's own exp claim settles it,
+            # and the body usually names the missing permission.
+            log.error(
+                "Leadrat %s %s -> %s | token %s | %s",
+                method,
+                path,
+                resp.status_code,
+                describe_expiry(self.jwt),
+                resp.text[:300],
+            )
             raise AuthError("Leadrat rejected the JWT (expired or not permitted)")
 
         # Leadrat answers a malformed or expired token with a 500 whose body
