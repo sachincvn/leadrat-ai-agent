@@ -18,6 +18,7 @@ unexpected in a tool result costs the block, not the turn.
 """
 
 import json
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -244,6 +245,105 @@ def _property_counts(data: dict) -> list[Block]:
     return _stat_tiles("Properties", _tiles(data, CATEGORY_TILES))
 
 
+# ------------------------------------------------------------- report tables
+
+# A report row carries far more columns than fit on a screen, and which ones
+# exist changes per tenant, so the table is capped at what can be read at a
+# glance and the rest stays in the JSON the model already has.
+MAX_TABLE_COLUMNS = 8
+MAX_TABLE_ROWS = 25
+
+# The column a report row is identified by, whichever of these it uses. It is
+# pinned first so every report reads left-to-right from "who" or "what".
+_LABEL_KEYS = (
+    "userName", "name", "displayName", "fullName", "sourceName", "source",
+    "subSource", "projectName", "campaignName", "channelPartnerName",
+    "countryName", "country", "statusName",
+)
+
+# Columns that identify a row to the CRM but mean nothing on screen.
+_HIDDEN_KEY_PARTS = ("id", "guid", "uuid")
+
+
+def _is_hidden_column(key: str) -> bool:
+    lowered = key.lower()
+    return any(part in lowered for part in _HIDDEN_KEY_PARTS)
+
+
+def _column_label(key: str) -> str:
+    """"meetingDoneCount" -> "Meeting done"."""
+    spaced = re.sub(r"(?<!^)(?=[A-Z])", " ", key).replace("_", " ").strip()
+    words = [word for word in spaced.split() if word.lower() != "count"]
+    label = " ".join(words) or spaced
+    return label[0].upper() + label[1:].lower() if label else key
+
+
+def _table_columns(rows: list[dict]) -> list[dict]:
+    """The columns worth drawing, label first and the emptiest dropped.
+
+    Report responses are wide and sparse - a tenant that does not use a metric
+    still gets its column, full of nulls - so columns are ranked by how often
+    they are actually filled rather than by the order the backend listed them.
+    """
+    keys: list[str] = []
+    for row in rows:
+        for key in row:
+            if key not in keys and not _is_hidden_column(key):
+                keys.append(key)
+
+    label_key = next((key for key in _LABEL_KEYS if key in keys), None)
+    if label_key is None:
+        label_key = next((key for key in keys if isinstance(rows[0].get(key), str)), None)
+
+    def filled(key: str) -> int:
+        return sum(1 for row in rows if row.get(key) not in (None, "", []))
+
+    others = sorted(
+        (key for key in keys if key != label_key and filled(key)),
+        key=lambda key: (-filled(key), keys.index(key)),
+    )
+    chosen = ([label_key] if label_key else []) + others[: MAX_TABLE_COLUMNS - bool(label_key)]
+    return [
+        {
+            "key": key,
+            "label": _column_label(key),
+            "numeric": any(isinstance(row.get(key), (int, float)) for row in rows),
+        }
+        for key in chosen
+    ]
+
+
+def _report_table(title: str, data: dict) -> list[Block]:
+    """One report as a table, or nothing when it came back empty."""
+    rows = [row for row in data.get("rows", []) if isinstance(row, dict)]
+    if not rows:
+        return []
+
+    columns = _table_columns(rows)
+    if not columns:
+        return []
+
+    keys = [column["key"] for column in columns]
+    return [
+        Block(
+            name="data_table",
+            props={
+                "title": title,
+                "total": data.get("total"),
+                "columns": columns,
+                "rows": [
+                    {key: row.get(key) for key in keys} for row in rows[:MAX_TABLE_ROWS]
+                ],
+            },
+        )
+    ]
+
+
+def _report(title: str) -> Callable[[dict], list[Block]]:
+    """A renderer for one named report."""
+    return lambda data: _report_table(title, data)
+
+
 RENDERERS: dict[str, Callable[[dict], list[Block]]] = {
     "search_leads": _leads,
     "get_lead": _single_lead,
@@ -253,6 +353,20 @@ RENDERERS: dict[str, Callable[[dict], list[Block]]] = {
     "list_properties": _properties,
     "get_property_count": _property_counts,
     "list_listings": _listings,
+    "get_activity_report": _report("Activity by user"),
+    "get_call_report": _report("Calls by user"),
+    "get_user_status_report": _report("Leads by user and status"),
+    "get_user_substatus_report": _report("Leads by user and sub-status"),
+    "get_user_source_report": _report("Leads by user and source"),
+    "get_user_subsource_report": _report("Leads by user and sub-source"),
+    "get_source_status_report": _report("Leads by source and status"),
+    "get_subsource_status_report": _report("Leads by sub-source and status"),
+    "get_project_status_report": _report("Leads by project and status"),
+    "get_country_status_report": _report("Leads by country and status"),
+    "get_campaign_substatus_report": _report("Leads by campaign and sub-status"),
+    "get_channel_partner_substatus_report": _report("Leads by channel partner and sub-status"),
+    "get_revenue_source_report": _report("Revenue by source"),
+    "get_revenue_subsource_report": _report("Revenue by sub-source"),
 }
 
 

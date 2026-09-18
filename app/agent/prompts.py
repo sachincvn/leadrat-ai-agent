@@ -22,6 +22,17 @@ Routing:
   Properties -> list_properties. Portal listings -> list_listings. The
   *_count tools are category totals only, never a list.
 - Tenant configuration -> get_global_settings.
+- Team performance, "who is doing what", any per-user or per-channel
+  breakdown -> a report, never a lead list you count yourself:
+  by user -> get_user_status_report, get_user_substatus_report,
+  get_user_source_report, get_user_subsource_report; what people did ->
+  get_activity_report (meetings, visits, edits, notes, messages),
+  get_call_report; by channel -> get_source_status_report,
+  get_subsource_status_report, get_campaign_substatus_report,
+  get_channel_partner_substatus_report; by project, country ->
+  get_project_status_report, get_country_status_report; money ->
+  get_revenue_source_report, get_revenue_subsource_report.
+  A report's columns differ per tenant: read the names off the rows returned.
 - Before filtering on a status, property type, project type, area unit or
   amenity, call the matching list_* tool to see the tenant's real values.
 

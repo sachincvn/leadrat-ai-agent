@@ -16,7 +16,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-BlockName = Literal["record_list", "stat_tiles", "action_chips"]
+BlockName = Literal["record_list", "stat_tiles", "data_table", "action_chips"]
 
 # Every CRM record the client can open. `kind` is what tells it which screen a
 # row belongs to, so one list block serves leads, projects, properties and
@@ -35,6 +35,9 @@ class Block(BaseModel):
                   "records": [{"id", "title", "subtitle", "badge",
                                "details": [{"label", "value"}]}]}
     stat_tiles   {"title": str, "tiles": [{"label": str, "value": int}]}
+    data_table   {"title": str, "total": int|None,
+                  "columns": [{"key": str, "label": str, "numeric": bool}],
+                  "rows": [{<column key>: str|int|float|None}]}
     action_chips {"prompts": [str]}
     """
 
