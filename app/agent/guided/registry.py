@@ -222,6 +222,26 @@ ACTIONS: list[Action] = [
         ],
     ),
     Action(
+        name="save_lead_form",
+        description=(
+            "Save the new-lead form that is on screen. This is the only action "
+            "that writes to the CRM, and the user is asked to confirm before it "
+            "happens. Call it when they say to save, and only once the form has "
+            "what it needs - check with fill_lead_form first if you are unsure."
+        ),
+        params=[],
+        writes_to_crm=True,
+        steps=[
+            {
+                "type": "confirm",
+                "message": "Save this lead?",
+                "say": "Asking you to confirm",
+            },
+            {"type": "click", "target": "lead-form.save", "say": "Saving the lead"},
+            {"type": "readState", "key": "lead_form", "say": "Checking the result"},
+        ],
+    ),
+    Action(
         name="read_screen",
         description=(
             "Read what is currently on screen. Use it before answering a question "
