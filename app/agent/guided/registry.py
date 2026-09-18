@@ -120,16 +120,41 @@ ACTIONS: list[Action] = [
         ],
     ),
     Action(
-        name="open_new_lead_form",
+        name="create_lead",
         description=(
-            "Open the form for adding a lead, so the user can fill it in. Use this "
-            "when they say they want to add or create a lead. The form is not "
-            "submitted for them."
+            "Open the new-lead form and fill it in for the user. Name and phone "
+            "are required by the form itself - ask the user for whichever you do "
+            "not have, and never invent one. Pass any other detail they gave "
+            "you. The form is left open for them to check and save; this does "
+            "not write anything to the CRM."
         ),
-        params=[],
+        params=[
+            Param("name", "Full name of the lead.", required=True),
+            Param("phone", "Contact number, digits as the user gave them.", required=True),
+            Param("email", "Email address, if the user gave one."),
+        ],
         steps=[
-            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
-            {"type": "click", "target": "leads.add-lead", "say": "Opening the new lead form"},
+            {"type": "navigate", "to": "new-lead", "say": "Opening the new lead form"},
+            {"type": "waitFor", "target": "lead-form.name", "say": "Waiting for the form"},
+            {
+                "type": "fill",
+                "target": "lead-form.name",
+                "value": "{{name}}",
+                "say": "Typing the name",
+            },
+            {
+                "type": "fill",
+                "target": "lead-form.phone",
+                "value": "{{phone}}",
+                "say": "Typing the phone number",
+            },
+            {
+                "type": "fill",
+                "target": "lead-form.email",
+                "value": "{{email}}",
+                "optional": True,
+                "say": "Typing the email",
+            },
         ],
     ),
     Action(

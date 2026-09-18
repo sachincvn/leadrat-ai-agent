@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
 
     # llm
-    llm_provider: str = "huggingface"  # huggingface | mistral
+    llm_provider: str = "huggingface"  # huggingface | mistral | groq
     llm_temperature: float = 0.1
     llm_max_tokens: int = 1500
     # Reasoning models (Qwen3, DeepSeek-R1, ...) spend most of their latency
@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     mistral_model: str = "mistral-large-latest"
     # La Plateforme is OpenAI-compatible, so it reuses the same client.
     mistral_base_url: str = "https://api.mistral.ai/v1"
+    groq_api_key: str = ""
+    # Tool-capable and on Groq's free tier. openai/gpt-oss-20b and
+    # qwen/qwen3-32b also call tools; llama-3.1-8b-instant is faster and worse
+    # at picking arguments.
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
 
     # agent
     agent_max_steps: int = 5
@@ -53,6 +59,7 @@ class Settings(BaseSettings):
         return {
             "huggingface": self.hf_model,
             "mistral": self.mistral_model,
+            "groq": self.groq_model,
         }.get(self.llm_provider, "unknown")
 
     @property
