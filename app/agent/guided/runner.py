@@ -91,6 +91,15 @@ def run_turn(request: AssistantTurnRequest) -> AssistantTurnResponse:
         appended.append(TranscriptEntry(role="user", text=request.message))
     if request.tool_results:
         for result in request.tool_results:
+            # What the browser actually did is the only account of a flow that
+            # exists: the steps run out there, and until this was logged a
+            # walkthrough that failed silently looked, from here, exactly like
+            # one that worked.
+            log.info(
+                "step result%s: %s",
+                " (FAILED)" if result.is_error else "",
+                result.content[:400],
+            )
             messages.append(ToolMessage(content=result.content, tool_call_id=result.id))
         appended.append(TranscriptEntry(role="tool", results=request.tool_results))
 
@@ -166,6 +175,21 @@ def run_turn(request: AssistantTurnRequest) -> AssistantTurnResponse:
 
         # Anything for the browser ends the turn. Server-side results from the
         # same reply ride along so the client replays them in the right order.
+        if plan:
+            # The steps the browser is about to run, so a flow that goes wrong
+            # can be read against what it was told to do.
+            for item in plan:
+                log.info(
+                    "plan %s(%s): %s",
+                    item.action,
+                    item.args,
+                    " | ".join(
+                        f"{step.type} {step.target or step.to or ''}"
+                        f"{'=' + step.value if step.value else ''}".strip()
+                        for step in item.steps
+                    ),
+                )
+
         if plan or rejected:
             if server_results:
                 messages += [
