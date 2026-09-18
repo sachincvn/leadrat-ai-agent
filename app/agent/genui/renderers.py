@@ -283,6 +283,48 @@ def _single_lead(data: dict) -> list[Block]:
     ]
 
 
+def _brief(data: dict) -> list[Block]:
+    """A lead as something to act on.
+
+    The stats are the three numbers a salesperson opens a lead to find, and
+    the signals are the facts that decide the next move - both worked out by
+    the tool, not by the model. The prose beside this block is where the
+    advice lives.
+    """
+    lead = data.get("lead") or {}
+    if not lead.get("id"):
+        return []
+
+    stats = _details(
+        ("In pipeline", _count_of(data.get("days_in_pipeline"), "days")),
+        ("Last update", _count_of(data.get("days_since_update"), "days ago")),
+        ("Owner", lead.get("assigned_to")),
+    )
+
+    return [
+        Block(
+            name="lead_brief",
+            props={
+                "id": lead.get("id"),
+                "name": lead.get("name"),
+                "status": lead.get("status"),
+                "phone": lead.get("phone"),
+                "email": lead.get("email"),
+                "stats": stats,
+                "signals": data.get("signals") or [],
+                "fields": _details(
+                    ("Wants", lead.get("requirement")),
+                    ("Project", lead.get("project")),
+                    ("Location", lead.get("location")),
+                    ("Source", _join(lead.get("source"), lead.get("sub_source"))),
+                    ("Next scheduled", lead.get("scheduled_at")),
+                ),
+            },
+        ),
+        _chips("Show this lead's history", "Find similar leads"),
+    ]
+
+
 def _history(data: dict) -> list[Block]:
     """A lead's audit trail as a timeline.
 
@@ -330,7 +372,10 @@ def _history(data: dict) -> list[Block]:
                 "total": data.get("total_entries"),
                 "entries": entries,
             },
-        )
+        ),
+        # History says what happened; the obvious next question is what to do
+        # about it.
+        _chips("Summarize this lead and what I should do next"),
     ]
 
 
@@ -522,6 +567,7 @@ RENDERERS: dict[str, Callable[[dict], list[Block]]] = {
     "search_leads": _leads,
     "get_lead": _single_lead,
     "get_lead_history": _history,
+    "summarize_lead": _brief,
     "get_lead_counts": _lead_counts,
     "list_projects": _projects,
     "get_project_count": _project_counts,

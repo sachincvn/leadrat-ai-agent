@@ -19,6 +19,7 @@ from pydantic import BaseModel
 BlockName = Literal[
     "record_list",
     "lead_detail",
+    "lead_brief",
     "timeline",
     "stat_tiles",
     "data_table",
@@ -42,6 +43,10 @@ class Block(BaseModel):
                   "records": [{"id", "title", "subtitle", "badge",
                                "details": [{"label", "value"}]}]}
     lead_detail  {"id", "name", "status", "phone", "email",
+                  "fields": [{"label", "value"}]}
+    lead_brief   {"id", "name", "status", "phone", "email",
+                  "stats": [{"label", "value"}],
+                  "signals": [{"text", "tone": good|warn|alert}],
                   "fields": [{"label", "value"}]}
     timeline     {"title": str, "total": int|None,
                   "entries": [{"title", "detail", "by", "at"}]}
