@@ -614,10 +614,12 @@ ACTIONS: list[Action] = [
         name="open_lead_rotation",
         description=(
             "Open lead rotation for a portal account: the integration, its "
-            "Assign To sheet, Select Team, and the rotation switch turned on, "
-            "so the settings are on screen. Use it when the user wants leads "
-            "from a portal shared out across a team automatically. Then use "
-            "fill_lead_rotation."
+            "Assign To sheet, Select Team, and the rotation switch turned on. "
+            "It stops there, because the team is the user's choice and the "
+            "list is theirs to read - ask them to pick it on screen, and when "
+            "they have, read the form again. A team that is already set up "
+            "brings its rotation with it, so usually the only thing left is "
+            "to save."
         ),
         params=[
             Param(
@@ -676,19 +678,11 @@ ACTIONS: list[Action] = [
             "the group and are greyed out - never ask for them, and do not "
             "pass them. Pass only what the user gave you: anything left out is "
             "left alone, so this can be called again to fix one field. It "
-            "reports what is still missing, and it does not save. Choosing the "
-            "team on its own is a normal first call: a team set up before "
-            "fills the rest in, and the read then says there is nothing "
-            "left to ask for."
+            "reports what is still missing, and it does not save. It is only "
+            "needed when the team the user picked did not bring a setting with "
+            "it - most of the time the form is complete and this is skipped."
         ),
         params=[
-            Param(
-                "team",
-                "The team the leads are shared across, as the dropdown names "
-                "it. Required, and the user has to say which - there is no "
-                "sensible default, and picking one for them assigns other "
-                "people's leads.",
-            ),
             Param(
                 "shift_from",
                 'Start of the shift, with AM or PM: "9:00 AM". The picker is a '
@@ -713,13 +707,6 @@ ACTIONS: list[Action] = [
             Param("buffer_minutes", "Optional buffer in minutes between rotations."),
         ],
         steps=[
-            {
-                "type": "select",
-                "target": "assignment.team",
-                "value": "{{team}}",
-                "optional": True,
-                "say": "Select Team - who the leads go to",
-            },
             {
                 # Not a fill: the field is readonly and only its picker can set
                 # it, so typing into it changes nothing and reports success.
