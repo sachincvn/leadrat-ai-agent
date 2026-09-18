@@ -185,8 +185,15 @@ ACTIONS: list[Action] = [
                 "The phone number's country, by name - 'India', 'United Arab "
                 "Emirates'. The form defaults to one country and rejects a "
                 "number that does not match it, so pass this whenever the "
-                "user names a country or their number is rejected.",
+                "user names a country or their number is rejected. Not needed "
+                "when the number already carries its code.",
             ),
+            Param("sub_source", "The sub-source under the source, if they said one."),
+            Param("owner", "Who to assign the lead to, by name as it appears in the CRM."),
+            Param("city", "The city the lead is enquiring about."),
+            Param("min_budget", "Lower end of their budget, digits only."),
+            Param("max_budget", "Upper end of their budget, digits only."),
+            Param("notes", "Anything they said about the lead that is worth recording."),
         ],
         steps=[
             {
@@ -223,6 +230,48 @@ ACTIONS: list[Action] = [
                 "value": "{{source}}",
                 "optional": True,
                 "say": "Choosing {{source}} as the source",
+            },
+            {
+                "type": "select",
+                "target": "lead-form.sub-source",
+                "value": "{{sub_source}}",
+                "optional": True,
+                "say": "Choosing {{sub_source}}",
+            },
+            {
+                "type": "select",
+                "target": "lead-form.owner",
+                "value": "{{owner}}",
+                "optional": True,
+                "say": "Assigning to {{owner}}",
+            },
+            {
+                "type": "fill",
+                "target": "lead-form.city",
+                "value": "{{city}}",
+                "optional": True,
+                "say": "Typing the city",
+            },
+            {
+                "type": "fill",
+                "target": "lead-form.min-budget",
+                "value": "{{min_budget}}",
+                "optional": True,
+                "say": "Typing the minimum budget",
+            },
+            {
+                "type": "fill",
+                "target": "lead-form.max-budget",
+                "value": "{{max_budget}}",
+                "optional": True,
+                "say": "Typing the maximum budget",
+            },
+            {
+                "type": "fill",
+                "target": "lead-form.notes",
+                "value": "{{notes}}",
+                "optional": True,
+                "say": "Adding the note",
             },
             {"type": "readState", "key": "lead_form", "say": "Checking the form"},
         ],
