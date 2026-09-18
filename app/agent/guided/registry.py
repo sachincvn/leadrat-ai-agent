@@ -105,15 +105,15 @@ ACTIONS: list[Action] = [
             ),
         ],
         steps=[
-            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
+            {"type": "navigate", "to": "leads", "say": "Leads, in the menu on the left"},
             {
                 "type": "fill",
                 "target": "leads.search",
                 "value": "{{keyword}}",
                 "submit": True,
-                "say": 'Searching for "{{keyword}}"',
+                "say": 'Typing "{{keyword}}" in the search box, then Enter',
             },
-            {"type": "readState", "key": "visible_leads", "say": "Reading what came back"},
+            {"type": "readState", "key": "visible_leads", "say": "Reading the rows that came back"},
         ],
     ),
     Action(
@@ -121,7 +121,7 @@ ACTIONS: list[Action] = [
         description="Empty the search box on the leads page and show the full list again.",
         params=[],
         steps=[
-            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
+            {"type": "navigate", "to": "leads", "say": "Leads, in the menu on the left"},
             {
                 "type": "fill",
                 "target": "leads.search",
@@ -162,10 +162,10 @@ ACTIONS: list[Action] = [
             # Through the button on the leads page rather than straight to the
             # form's route: the user is being shown where Add Lead is, and a
             # page that simply appears teaches them nothing.
-            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
-            {"type": "click", "target": "leads.add-lead", "say": "Clicking Add Lead"},
-            {"type": "waitFor", "target": "lead-form.name", "say": "Waiting for the form"},
-            {"type": "readState", "key": "lead_form", "say": "Checking what the form needs"},
+            {"type": "navigate", "to": "leads", "say": "Leads, in the menu on the left"},
+            {"type": "click", "target": "leads.add-lead", "say": "Add Lead, top right of the leads list"},
+            {"type": "waitFor", "target": "lead-form.name", "say": "The new lead form opens here"},
+            {"type": "readState", "key": "lead_form", "say": "Reading which fields it needs"},
         ],
     ),
     Action(
@@ -210,7 +210,7 @@ ACTIONS: list[Action] = [
                 "target": "lead-form.name",
                 "value": "{{name}}",
                 "optional": True,
-                "say": "Typing the name",
+                "say": "Name - the one field it will not save without",
             },
             {
                 "type": "selectCountry",
@@ -224,21 +224,21 @@ ACTIONS: list[Action] = [
                 "target": "lead-form.phone",
                 "value": "{{phone}}",
                 "optional": True,
-                "say": "Typing the phone number",
+                "say": "Contact number, with its country beside it",
             },
             {
                 "type": "fill",
                 "target": "lead-form.email",
                 "value": "{{email}}",
                 "optional": True,
-                "say": "Typing the email",
+                "say": "Email, under the contact number",
             },
             {
                 "type": "select",
                 "target": "lead-form.source",
                 "value": "{{source}}",
                 "optional": True,
-                "say": "Choosing {{source}} as the source",
+                "say": "Source - where this lead came from",
             },
             {
                 "type": "select",
@@ -252,7 +252,7 @@ ACTIONS: list[Action] = [
                 "target": "lead-form.owner",
                 "value": "{{owner}}",
                 "optional": True,
-                "say": "Assigning to {{owner}}",
+                "say": "Assign To - who owns this lead now",
             },
             {
                 "type": "fill",
@@ -280,7 +280,7 @@ ACTIONS: list[Action] = [
                 "target": "lead-form.notes",
                 "value": "{{notes}}",
                 "optional": True,
-                "say": "Adding the note",
+                "say": "Notes, at the bottom of the form",
             },
             {"type": "readState", "key": "lead_form", "say": "Checking the form"},
         ],
@@ -301,10 +301,10 @@ ACTIONS: list[Action] = [
                 "message": "Save this lead?",
                 "say": "Asking you to confirm",
             },
-            {"type": "click", "target": "lead-form.save", "say": "Saving the lead"},
+            {"type": "click", "target": "lead-form.save", "say": "Save, bottom right - this is the one that writes it"},
             # The click starts the request; this waits for it to finish and
             # says whether it did, rather than reading the form back mid-save.
-            {"type": "readState", "key": "lead_saved", "say": "Waiting for the save"},
+            {"type": "readState", "key": "lead_saved", "say": "Waiting for the CRM to take it"},
         ],
     ),
     Action(
@@ -325,26 +325,26 @@ ACTIONS: list[Action] = [
             ),
         ],
         steps=[
-            {"type": "navigate", "to": "settings", "say": "Opening settings"},
+            {"type": "navigate", "to": "settings", "say": "Global Config, in the menu on the left"},
             {
                 "type": "click",
                 "target": "integration.{{partner}}",
-                "say": "Opening {{partner}}",
+                "say": "Connect Now on the {{partner}} card",
             },
             {
                 "type": "click",
                 "target": "integration.add-account",
-                "say": "Clicking Add Account",
+                "say": "Add Account - each portal login is one account",
             },
             {
                 "type": "waitFor",
                 "target": "integration-form.account-name",
-                "say": "Waiting for the account form",
+                "say": "The account form opens from the right",
             },
             {
                 "type": "readState",
                 "key": "integration_form",
-                "say": "Checking what the form needs",
+                "say": "Reading which fields it needs",
             },
         ],
     ),
@@ -373,14 +373,14 @@ ACTIONS: list[Action] = [
                 "target": "integration-form.account-name",
                 "value": "{{account_name}}",
                 "optional": True,
-                "say": "Typing the account name",
+                "say": "Account Name - whatever you will recognise it by",
             },
             {
                 "type": "fill",
                 "target": "integration-form.login-email",
                 "value": "{{login_email}}",
                 "optional": True,
-                "say": "Typing the login id",
+                "say": "Login Id - the one you use on the portal",
             },
             {
                 "type": "fill",
@@ -388,7 +388,7 @@ ACTIONS: list[Action] = [
                 "value": "{{manager_email}}",
                 "submit": True,
                 "optional": True,
-                "say": "Adding the relationship manager's email",
+                "say": "Relationship Manager Email - who receives the setup details",
             },
             {
                 "type": "readState",
@@ -417,7 +417,7 @@ ACTIONS: list[Action] = [
             {
                 "type": "click",
                 "target": "integration-form.submit",
-                "say": "Submitting the account",
+                "say": "Add Account - this sends the details to them",
             },
             {
                 "type": "readState",
@@ -443,12 +443,12 @@ ACTIONS: list[Action] = [
             Param("owner", "Who the leads are assigned to, by name."),
         ],
         steps=[
-            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
-            {"type": "click", "target": "leads.filters", "say": "Opening the filters"},
+            {"type": "navigate", "to": "leads", "say": "Leads, in the menu on the left"},
+            {"type": "click", "target": "leads.filters", "say": "Filters, above the leads list"},
             {
                 "type": "waitFor",
                 "target": "lead-filter.apply",
-                "say": "Waiting for the filter panel",
+                "say": "The filter panel opens from the top",
             },
             {
                 "type": "select",
@@ -485,8 +485,8 @@ ACTIONS: list[Action] = [
                 "optional": True,
                 "say": "Assigning filter to {{owner}}",
             },
-            {"type": "click", "target": "lead-filter.apply", "say": "Applying the filters"},
-            {"type": "readState", "key": "visible_leads", "say": "Reading what came back"},
+            {"type": "click", "target": "lead-filter.apply", "say": "Search - applies everything set above"},
+            {"type": "readState", "key": "visible_leads", "say": "Reading the rows that came back"},
         ],
     ),
     Action(
@@ -501,13 +501,13 @@ ACTIONS: list[Action] = [
             Param("view", "Which view to switch to.", required=True, enum=QUICK_FILTERS),
         ],
         steps=[
-            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
+            {"type": "navigate", "to": "leads", "say": "Leads, in the menu on the left"},
             {
                 "type": "click",
                 "target": "leads.quick-filter.{{view}}",
                 "say": "Switching to {{view}}",
             },
-            {"type": "readState", "key": "visible_leads", "say": "Reading what came back"},
+            {"type": "readState", "key": "visible_leads", "say": "Reading the rows that came back"},
         ],
     ),
     Action(
@@ -519,14 +519,14 @@ ACTIONS: list[Action] = [
         ),
         params=[],
         steps=[
-            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
-            {"type": "click", "target": "leads.filters", "say": "Opening the filters"},
+            {"type": "navigate", "to": "leads", "say": "Leads, in the menu on the left"},
+            {"type": "click", "target": "leads.filters", "say": "Filters, above the leads list"},
             {
                 "type": "waitFor",
                 "target": "lead-filter.reset",
-                "say": "Waiting for the filter panel",
+                "say": "The filter panel opens from the top",
             },
-            {"type": "click", "target": "lead-filter.reset", "say": "Clearing every filter"},
+            {"type": "click", "target": "lead-filter.reset", "say": "Reset - clears every filter at once"},
             {"type": "readState", "key": "visible_leads", "say": "Reading the full list"},
         ],
     ),
