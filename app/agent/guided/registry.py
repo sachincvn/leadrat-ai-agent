@@ -26,7 +26,7 @@ PAGES = (
     "tasks",
     "reports",
 )
-READABLE = ("visible_leads", "current_page")
+READABLE = ("visible_leads", "current_page", "lead_form")
 
 
 @dataclass(frozen=True)
@@ -120,32 +120,49 @@ ACTIONS: list[Action] = [
         ],
     ),
     Action(
-        name="create_lead",
+        name="open_new_lead_form",
         description=(
-            "Open the new-lead form and fill it in for the user. Name and phone "
-            "are required by the form itself - ask the user for whichever you do "
-            "not have, and never invent one. Pass any other detail they gave "
-            "you. The form is left open for them to check and save; this does "
-            "not write anything to the CRM."
+            "Open the form for adding a lead. Call this FIRST when the user "
+            "wants to add one, before asking them for anything: the form "
+            "reports which fields it requires, and the user can see what is "
+            "being filled in. Then use fill_lead_form."
         ),
-        params=[
-            Param("name", "Full name of the lead.", required=True),
-            Param("phone", "Contact number, digits as the user gave them.", required=True),
-            Param("email", "Email address, if the user gave one."),
-        ],
+        params=[],
         steps=[
             {"type": "navigate", "to": "new-lead", "say": "Opening the new lead form"},
             {"type": "waitFor", "target": "lead-form.name", "say": "Waiting for the form"},
+            {"type": "readState", "key": "lead_form", "say": "Checking what the form needs"},
+        ],
+    ),
+    Action(
+        name="fill_lead_form",
+        description=(
+            "Type into the new-lead form that is already open. Pass only the "
+            "values the user actually gave you; anything you leave out is left "
+            "alone, so this can be called again to correct one field without "
+            "touching the rest. It reports back what the form is now "
+            "complaining about, which is what to ask the user about next. It "
+            "never saves - the user does that."
+        ),
+        params=[
+            Param("name", "Full name of the lead."),
+            Param("phone", "Contact number, digits as the user gave them."),
+            Param("email", "Email address."),
+            Param("source", "Where the lead came from, e.g. Referral, Walk In."),
+        ],
+        steps=[
             {
                 "type": "fill",
                 "target": "lead-form.name",
                 "value": "{{name}}",
+                "optional": True,
                 "say": "Typing the name",
             },
             {
                 "type": "fill",
                 "target": "lead-form.phone",
                 "value": "{{phone}}",
+                "optional": True,
                 "say": "Typing the phone number",
             },
             {
@@ -155,6 +172,14 @@ ACTIONS: list[Action] = [
                 "optional": True,
                 "say": "Typing the email",
             },
+            {
+                "type": "select",
+                "target": "lead-form.source",
+                "value": "{{source}}",
+                "optional": True,
+                "say": "Choosing {{source}} as the source",
+            },
+            {"type": "readState", "key": "lead_form", "say": "Checking the form"},
         ],
     ),
     Action(
