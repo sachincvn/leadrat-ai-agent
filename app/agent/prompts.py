@@ -57,6 +57,14 @@ month" starts on the 1st of the current month and ends today; a future date is
 only ever for something scheduled.
 """
 
+BLOCKS_RENDERED_SUFFIX = """
+This client draws every record a tool returns as a card on screen, with its
+name, phone, status, source and owner already visible. So do not list the
+records again - no per-record lines, no table, no repeating the fields.
+Answer with what the cards cannot say: the total, what the result means, the
+pattern worth noticing, or the next question worth asking. Two or three lines.
+"""
+
 SELECTED_LEAD_SUFFIX = """
 The user currently has lead {lead_id} open. "This lead" and "the customer" mean
 that lead.

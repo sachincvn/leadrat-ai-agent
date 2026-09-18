@@ -63,6 +63,7 @@ def stream_chat(request: ChatRequest, caller: Caller) -> Iterator[dict]:
             lead_id=request.lead_id,
             history=history,
             recent_tool_notes=recent_tool_notes,
+            renders_blocks=request.renders_blocks,
         ),
     )
     for event in events:

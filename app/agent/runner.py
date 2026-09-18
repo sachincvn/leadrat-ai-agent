@@ -9,6 +9,7 @@ from app.agent.genui import render_blocks
 from app.agent.llm import get_llm
 from app.agent.llm.errors import describe_llm_failure
 from app.agent.prompts import (
+    BLOCKS_RENDERED_SUFFIX,
     RECENT_DATA_SUFFIX,
     SELECTED_LEAD_SUFFIX,
     SYSTEM_PROMPT,
@@ -81,10 +82,13 @@ def _build_messages(
     lead_id: str | None,
     history: list[BaseMessage] | None,
     recent_tool_notes: list[str] | None,
+    renders_blocks: bool = False,
 ) -> list[BaseMessage]:
     system = SYSTEM_PROMPT + TODAY_SUFFIX.format(
         today=describe_today(), today_iso=today_iso()
     )
+    if renders_blocks:
+        system += BLOCKS_RENDERED_SUFFIX
     if lead_id:
         system += SELECTED_LEAD_SUFFIX.format(lead_id=lead_id)
     if recent_tool_notes:
@@ -215,6 +219,7 @@ def stream_agent(
     lead_id: str | None = None,
     history: list[BaseMessage] | None = None,
     recent_tool_notes: list[str] | None = None,
+    renders_blocks: bool = False,
 ) -> Iterator[StreamEvent]:
     """The same loop as run_agent, emitting the answer as it is generated.
 
@@ -223,7 +228,9 @@ def stream_agent(
     the wait is explained rather than silent.
     """
     llm = get_llm().bind_tools(TOOLS)
-    messages = _build_messages(message, lead_id, history, recent_tool_notes)
+    messages = _build_messages(
+        message, lead_id, history, recent_tool_notes, renders_blocks
+    )
 
     tools_used: list[str] = []
     tool_notes: list[str] = []

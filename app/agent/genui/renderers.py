@@ -4,10 +4,14 @@ One renderer per tool, keyed by tool name. A tool with no renderer simply
 produces no blocks - the answer is then text only, which is the correct
 result for a tool whose output has no shape worth drawing.
 
-Every list tool maps onto the same record_list block. A record is reduced to
-four display slots - title, subtitle, badge, meta - because that is what a row
-in a chat panel has room for; which CRM field fills each slot is the only
-thing that differs between leads, projects, properties and listings.
+Every list tool maps onto the same record_list block. A record becomes a
+title, a subtitle, a badge and a list of labelled details; which CRM field
+fills each slot is the only thing that differs between leads, projects,
+properties and listings.
+
+The details are what lets the answer stop repeating the records in prose - a
+client that draws these cards says so on the request, and the model is then
+told the fields are already on screen.
 
 Renderers never raise: a block is a bonus on top of the answer, so anything
 unexpected in a tool result costs the block, not the turn.
@@ -71,6 +75,11 @@ def _record_list(kind: str, title: str, total: Any, records: list[dict]) -> list
     ]
 
 
+def _details(*pairs: tuple[str, Any]) -> list[dict]:
+    """Labelled fields for a card, minus the ones the CRM did not fill."""
+    return [{"label": label, "value": str(value)} for label, value in pairs if value]
+
+
 def _chips(*prompts: str) -> Block:
     return Block(name="action_chips", props={"prompts": list(prompts)})
 
@@ -116,17 +125,30 @@ def _count_of(value: Any, unit: str) -> str | None:
 # ---------------------------------------------------------------- renderers
 
 
+def _lead_row(lead: dict) -> dict:
+    """One lead as a card.
+
+    `details` carries the labelled fields the card shows under the name -
+    where the lead came from, who owns it, what is scheduled. They are the
+    things a user scans a list for, and the reason the answer no longer has
+    to repeat them in prose.
+    """
+    return {
+        "id": lead.get("id"),
+        "title": lead.get("name"),
+        "subtitle": _join(lead.get("phone"), lead.get("location")),
+        "badge": lead.get("status"),
+        "details": _details(
+            ("Source", _join(lead.get("source"), lead.get("sub_source"))),
+            ("Owner", lead.get("assigned_to")),
+            ("Project", lead.get("project")),
+            ("Scheduled", lead.get("scheduled_at")),
+        ),
+    }
+
+
 def _leads(data: dict) -> list[Block]:
-    records = [
-        {
-            "id": lead.get("id"),
-            "title": lead.get("name"),
-            "subtitle": _join(lead.get("phone"), lead.get("location")),
-            "badge": lead.get("status"),
-            "meta": lead.get("source"),
-        }
-        for lead in data.get("leads", [])
-    ]
+    records = [_lead_row(lead) for lead in data.get("leads", [])]
     total = data.get("total_matching_leads")
     return _record_list("lead", "Matching leads", total, records) + _more_chips(
         total, len(records), "Show me the next ones", "Break these down by status"
@@ -134,20 +156,7 @@ def _leads(data: dict) -> list[Block]:
 
 
 def _single_lead(data: dict) -> list[Block]:
-    blocks = _record_list(
-        "lead",
-        "Lead",
-        None,
-        [
-            {
-                "id": data.get("id"),
-                "title": data.get("name"),
-                "subtitle": _join(data.get("phone"), data.get("email")),
-                "badge": data.get("status"),
-                "meta": data.get("source"),
-            }
-        ],
-    )
+    blocks = _record_list("lead", "Lead", None, [_lead_row(data)])
     if blocks:
         blocks.append(_chips("Summarize this lead", "Show this lead's history"))
     return blocks
@@ -160,7 +169,7 @@ def _projects(data: dict) -> list[Block]:
             "title": project.get("name"),
             "subtitle": _price_range(project.get("min_price"), project.get("max_price")),
             "badge": project.get("status") or project.get("current_status"),
-            "meta": project.get("possession_date"),
+            "details": _details(("Possession", project.get("possession_date"))),
         }
         for project in data.get("projects", [])
     ]
@@ -180,7 +189,10 @@ def _properties(data: dict) -> list[Block]:
             "title": prop.get("title"),
             "subtitle": _join(_count_of(prop.get("no_of_bhk"), "BHK"), prop.get("project")),
             "badge": prop.get("status"),
-            "meta": _join(prop.get("sale_type"), prop.get("furnish_status")),
+            "details": _details(
+                ("Sale type", prop.get("sale_type")),
+                ("Furnishing", prop.get("furnish_status")),
+            ),
         }
         for prop in data.get("properties", [])
     ]
@@ -201,7 +213,7 @@ def _listings(data: dict) -> list[Block]:
                 listing.get("project"),
             ),
             "badge": listing.get("status"),
-            "meta": _count_of(listing.get("lead_count"), "leads"),
+            "details": _details(("Leads", listing.get("lead_count"))),
         }
         for listing in data.get("listings", [])
     ]

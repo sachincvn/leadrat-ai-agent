@@ -32,7 +32,8 @@ class Block(BaseModel):
     a deployed client degrades to text rather than breaking.
 
     record_list  {"title": str, "kind": RecordKind, "total": int|None,
-                  "records": [{"id", "title", "subtitle", "badge", "meta"}]}
+                  "records": [{"id", "title", "subtitle", "badge",
+                               "details": [{"label", "value"}]}]}
     stat_tiles   {"title": str, "tiles": [{"label": str, "value": int}]}
     action_chips {"prompts": [str]}
     """
