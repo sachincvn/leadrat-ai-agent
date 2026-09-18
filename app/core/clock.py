@@ -11,7 +11,7 @@ The zone is the one the CRM itself reports in (Asia/Calcutta, matching the
 running in UTC must not shift "today" by five and a half hours.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 CRM_TZ = ZoneInfo("Asia/Calcutta")
@@ -81,3 +81,30 @@ def resolve_range(value: str) -> tuple[str, str] | None:
     }
     span = ranges.get(key)
     return (span[0].isoformat(), span[1].isoformat()) if span else None
+
+
+def to_utc_instant(value: str | None) -> str | None:
+    """A date the way Leadrat's "dates" array wants it.
+
+    A plain date means a day in the tenant's own time zone, not in UTC, and the
+    backend is given UTC instants - so "2026-06-23" is the start of that day in
+    IST, which is "2026-06-22T18:30:00Z". Sending the bare date instead matches
+    nothing at all, which is why every window came back empty.
+
+    A value that already carries a time is passed through, as is anything that
+    is not an ISO date: the backend validates those itself.
+    """
+    if value is None:
+        return None
+
+    text = value.strip()
+    if not text or "T" in text:
+        return text or None
+
+    try:
+        day = date.fromisoformat(text)
+    except ValueError:
+        return text
+
+    start = datetime(day.year, day.month, day.day, tzinfo=CRM_TZ)
+    return start.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

@@ -1,19 +1,23 @@
 """The agent loop: ask the model, run any tool it requests, ask again, answer."""
 
+import json
 import re
 from collections.abc import Iterator
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 
+from app.agent.genui import render_blocks
 from app.agent.llm import get_llm
 from app.agent.llm.errors import describe_llm_failure
 from app.agent.prompts import (
+    BLOCKS_RENDERED_SUFFIX,
     RECENT_DATA_SUFFIX,
     SELECTED_LEAD_SUFFIX,
     SYSTEM_PROMPT,
     TODAY_SUFFIX,
 )
 from app.agent.sanitize import strip_internal_ids
+from app.agent.scoping import scope_to_caller
 from app.agent.streaming import SafeAnswerStream
 from app.agent.tools import TOOLS, TOOLS_BY_NAME
 from app.core.clock import describe_today, today_iso
@@ -53,6 +57,17 @@ _UNCLOSED_THINK_RE = re.compile(r"<think>.*\Z", re.DOTALL | re.IGNORECASE)
 # ids and names resolvable, small enough not to grow the prompt unchecked.
 TOOL_NOTE_CHARS = 700
 
+# How much of one tool call's arguments is carried with it. The arguments are
+# what a follow-up narrows - "show me the new ones" means the previous filter
+# plus a status - so the next turn cannot reproduce the result without them.
+TOOL_ARGS_CHARS = 400
+
+
+def _tool_note(call: dict, output: str) -> str:
+    """One line of "what was asked, and what came back"."""
+    args = json.dumps(call.get("args") or {}, default=str)[:TOOL_ARGS_CHARS]
+    return f"{call['name']}({args}) -> {output[:TOOL_NOTE_CHARS]}"
+
 
 def strip_thinking(content: str) -> str:
     text = _THINK_BLOCK_RE.sub("", content or "")
@@ -80,10 +95,13 @@ def _build_messages(
     lead_id: str | None,
     history: list[BaseMessage] | None,
     recent_tool_notes: list[str] | None,
+    renders_blocks: bool = False,
 ) -> list[BaseMessage]:
     system = SYSTEM_PROMPT + TODAY_SUFFIX.format(
         today=describe_today(), today_iso=today_iso()
     )
+    if renders_blocks:
+        system += BLOCKS_RENDERED_SUFFIX
     if lead_id:
         system += SELECTED_LEAD_SUFFIX.format(lead_id=lead_id)
     if recent_tool_notes:
@@ -95,10 +113,17 @@ def _build_messages(
     return messages
 
 
-def _run_tool(call: dict) -> str:
-    """One tool call, with a failure fed back to the model rather than raised."""
+def _run_tool(call: dict, failures: list[str] | None = None) -> str:
+    """One tool call, with a failure fed back to the model rather than raised.
+
+    `failures` collects the reason for each failed call so that a turn which
+    runs out of steps can say what actually went wrong instead of blaming the
+    step limit, which tells the user nothing they can act on.
+    """
     tool = TOOLS_BY_NAME.get(call["name"])
     if tool is None:
+        if failures is not None:
+            failures.append(f"unknown tool {call['name']}")
         return f"Unknown tool: {call['name']}"
 
     log.info("tool call: %s %s", call["name"], call["args"])
@@ -111,6 +136,8 @@ def _run_tool(call: dict) -> str:
         # instead, so the model gets a chance to recover - retry with a real
         # id, search by name first, or ask the user - in its next step.
         log.warning("tool call failed: %s %s (%s)", call["name"], call["args"], exc)
+        if failures is not None:
+            failures.append(str(exc))
         return (
             f"That call to {call['name']} failed: {exc}. "
             "If a required value was missing or guessed, get the real "
@@ -129,6 +156,7 @@ def run_agent(
 
     tools_used: list[str] = []
     tool_notes: list[str] = []
+    failures: list[str] = []
 
     for _ in range(settings.agent_max_steps):
         try:
@@ -152,13 +180,34 @@ def run_agent(
 
         messages.append(reply)
         for call in tool_calls:
-            output = _run_tool(call)
+            call = scope_to_caller(message, call)
+            output = _run_tool(call, failures)
             if call["name"] in TOOLS_BY_NAME:
                 tools_used.append(call["name"])
             messages.append(ToolMessage(content=output, tool_call_id=call["id"]))
-            tool_notes.append(f"{call['name']} -> {output[:TOOL_NOTE_CHARS]}")
+            tool_notes.append(_tool_note(call, output))
 
-    return AgentResult("I could not finish that within the step limit.", tools_used, tool_notes)
+    return AgentResult(_incomplete_answer(failures), tools_used, tool_notes)
+
+
+STEP_LIMIT_MESSAGE = (
+    "I could not finish that - I ran out of steps before I had an answer."
+)
+
+
+def _incomplete_answer(failures: list[str]) -> str:
+    """What to say when the loop ends with no answer.
+
+    A bare "step limit" line reads like the assistant gave up for no reason. If
+    the steps were spent on calls the CRM rejected, the last rejection is the
+    honest explanation, and the only one the user could act on.
+    """
+    if not failures:
+        return STEP_LIMIT_MESSAGE
+    return (
+        "I could not complete that - the CRM rejected the request. "
+        f"Last error: {failures[-1]}"
+    )
 
 
 # ---------------------------------------------------------------- streaming
@@ -169,6 +218,7 @@ class StreamEvent:
 
     kind is one of:
       "status" - a tool is running, so the UI can say what MUSO is doing
+      "block"  - a renderable block built from a tool result (see agent/genui)
       "text"   - display-ready text to append to the answer
       "done"   - the turn finished; carries the full answer and tools used
     """
@@ -183,6 +233,7 @@ def stream_agent(
     lead_id: str | None = None,
     history: list[BaseMessage] | None = None,
     recent_tool_notes: list[str] | None = None,
+    renders_blocks: bool = False,
 ) -> Iterator[StreamEvent]:
     """The same loop as run_agent, emitting the answer as it is generated.
 
@@ -191,10 +242,13 @@ def stream_agent(
     the wait is explained rather than silent.
     """
     llm = get_llm().bind_tools(TOOLS)
-    messages = _build_messages(message, lead_id, history, recent_tool_notes)
+    messages = _build_messages(
+        message, lead_id, history, recent_tool_notes, renders_blocks
+    )
 
     tools_used: list[str] = []
     tool_notes: list[str] = []
+    failures: list[str] = []
 
     for _ in range(settings.agent_max_steps):
         safe = SafeAnswerStream()
@@ -242,13 +296,19 @@ def stream_agent(
         # A tool-calling step: nothing shown so far belongs in the answer.
         messages.append(reply)
         for call in tool_calls:
+            call = scope_to_caller(message, call)
             yield StreamEvent("status", tool=call["name"])
-            output = _run_tool(call)
+            output = _run_tool(call, failures)
             if call["name"] in TOOLS_BY_NAME:
                 tools_used.append(call["name"])
             messages.append(ToolMessage(content=output, tool_call_id=call["id"]))
-            tool_notes.append(f"{call['name']} -> {output[:TOOL_NOTE_CHARS]}")
+            tool_notes.append(_tool_note(call, output))
+            # The data is on screen before the model has finished describing
+            # it, and it is the tool's own output - not something the model
+            # re-typed, and so not something it can get wrong.
+            for block in render_blocks(call["name"], output):
+                yield StreamEvent("block", name=block.name, props=block.props)
 
-    answer = "I could not finish that within the step limit."
+    answer = _incomplete_answer(failures)
     yield StreamEvent("text", text=answer)
     yield StreamEvent("done", answer=answer, tools_used=tools_used, tool_notes=tool_notes)

@@ -5,7 +5,10 @@ never executed on the server: the model picks an action, this module expands it
 into concrete UI steps, and the browser runs them against the real screen.
 
 `target` always names a `data-agent-id` attribute in the frontend - never a CSS
-selector, which would break on the next restyle.
+selector, which would break on the next restyle. An action whose target does
+not exist in the client yet does not belong here: the model would offer it,
+the browser would fail on it, and the user would be told the app did something
+it did not do.
 
 Placeholders `{{param}}` are filled by resolver.resolve().
 """
@@ -13,8 +16,17 @@ Placeholders `{{param}}` are filled by resolver.resolve().
 from dataclasses import dataclass
 from typing import Any
 
-PAGES = ("dashboard", "leads")
-READABLE = ("visible_leads", "status_counts", "current_filters")
+# Every page an action may send the user to. A name here must be one the web
+# client can route - see the client's own page map.
+PAGES = (
+    "dashboard",
+    "leads",
+    "projects",
+    "properties",
+    "tasks",
+    "reports",
+)
+READABLE = ("visible_leads", "current_page")
 
 
 @dataclass(frozen=True)
@@ -41,197 +53,90 @@ ACTIONS: list[Action] = [
     Action(
         name="navigate_to",
         description=(
-            "Move the user to a page of the app. Call this before any action that "
-            "lives on a different page than the one currently open."
+            "Take the user to a page of the app. Use this when they ask to go "
+            "somewhere, or before an action that lives on another page."
         ),
         params=[
             Param("page", "Which page to open.", required=True, enum=PAGES),
         ],
         steps=[
-            {"type": "navigate", "to": "{{page}}", "say": "Opening the {{page}} page"},
+            {"type": "navigate", "to": "{{page}}", "say": "Opening {{page}}"},
         ],
     ),
     Action(
-        name="filter_leads",
+        name="search_leads_on_screen",
         description=(
-            "Filter the leads table on screen. Pass only the values the user "
-            "actually stated; leave the rest out. Use this for requests like "
-            "'show me leads from Bangalore' or 'find leads from referrals'. "
-            "The result reports the rows now visible."
+            "Type a search into the leads page and show the user the result. Use "
+            "this when they want to SEE leads on screen - 'show me leads for "
+            "Raj', 'search for 98765'. To answer a question about leads without "
+            "moving them, use search_leads instead."
         ),
         params=[
-            Param("keyword", "A name or phone number to search for."),
-            Param("location", "City, exactly as it appears in the CRM."),
-            Param("source", "Lead source, e.g. Facebook, Google Ads, Referral, Walk In."),
-            Param("status", "Lead status, e.g. New, Interested, Qualified."),
+            Param("keyword", "A name, phone number or email to search for.", required=True),
         ],
         steps=[
-            {"type": "navigate", "to": "leads", "say": "Going to the Leads page"},
+            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
             {
                 "type": "fill",
-                "target": "leads.filter-keyword",
+                "target": "leads.search",
                 "value": "{{keyword}}",
-                "optional": True,
+                "submit": True,
                 "say": 'Searching for "{{keyword}}"',
             },
-            {
-                "type": "fill",
-                "target": "leads.filter-location",
-                "value": "{{location}}",
-                "optional": True,
-                "say": "Filtering location by {{location}}",
-            },
-            {
-                "type": "fill",
-                "target": "leads.filter-source",
-                "value": "{{source}}",
-                "optional": True,
-                "say": "Filtering source by {{source}}",
-            },
-            {
-                "type": "fill",
-                "target": "leads.filter-status",
-                "value": "{{status}}",
-                "optional": True,
-                "say": "Filtering status by {{status}}",
-            },
-            {"type": "click", "target": "leads.apply-filters", "say": "Applying the filters"},
-            {
-                "type": "readState",
-                "key": "visible_leads",
-                "say": "Reading the rows that came back",
-            },
+            {"type": "readState", "key": "visible_leads", "say": "Reading what came back"},
         ],
     ),
     Action(
-        name="clear_filters",
-        description="Remove every filter on the leads table and show the full list again.",
+        name="clear_lead_search",
+        description="Empty the search box on the leads page and show the full list again.",
         params=[],
         steps=[
-            {"type": "navigate", "to": "leads", "say": "Going to the Leads page"},
-            {"type": "click", "target": "leads.clear-filters", "say": "Clearing the filters"},
+            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
+            {
+                "type": "fill",
+                "target": "leads.search",
+                "value": "",
+                "submit": True,
+                "say": "Clearing the search",
+            },
             {"type": "readState", "key": "visible_leads", "say": "Reading the full list"},
         ],
     ),
     Action(
         name="open_lead",
         description=(
-            "Open one lead's detail panel. Needs the lead id - call filter_leads or "
-            "read_screen first if you do not have it. Never invent an id."
+            "Open one lead's own page. Needs the lead's id - find it with "
+            "search_leads first, and never invent one."
         ),
         params=[
             Param("lead_id", "Id of the lead, as returned by a previous tool.", required=True),
         ],
         steps=[
-            {"type": "navigate", "to": "leads", "say": "Going to the Leads page"},
             {
-                "type": "click",
-                "target": "leads.row.{{lead_id}}.open",
-                "say": "Opening lead {{lead_id}}",
-            },
-            {"type": "waitFor", "target": "lead-detail.panel", "say": "Waiting for the details"},
-        ],
-    ),
-    Action(
-        name="create_lead",
-        description=(
-            "Open the new-lead form and fill it in. Ask the user for any field you "
-            "do not know instead of inventing a value - never make up a phone number."
-        ),
-        params=[
-            Param("name", "Full name of the lead.", required=True),
-            Param("phone", "Phone number.", required=True),
-            Param("source", "Where the lead came from, e.g. Referral, Walk In."),
-            Param("location", "City."),
-        ],
-        writes_to_crm=True,
-        steps=[
-            {"type": "navigate", "to": "leads", "say": "Going to the Leads page"},
-            {
-                "type": "click",
-                "target": "leads.create-button",
-                "say": "Opening the new-lead form",
-            },
-            {"type": "waitFor", "target": "lead-form.name", "say": "Waiting for the form"},
-            {
-                "type": "fill",
-                "target": "lead-form.name",
-                "value": "{{name}}",
-                "say": "Typing the name",
-            },
-            {
-                "type": "fill",
-                "target": "lead-form.phone",
-                "value": "{{phone}}",
-                "say": "Typing the phone number",
-            },
-            {
-                "type": "fill",
-                "target": "lead-form.source",
-                "value": "{{source}}",
-                "optional": True,
-                "say": "Setting the source to {{source}}",
-            },
-            {
-                "type": "fill",
-                "target": "lead-form.location",
-                "value": "{{location}}",
-                "optional": True,
-                "say": "Setting the location to {{location}}",
-            },
-            {
-                "type": "confirm",
-                "message": "Create this lead?",
-                "say": "Asking you to confirm",
-            },
-            {"type": "click", "target": "lead-form.submit", "say": "Saving the lead"},
-            {
-                "type": "waitForGone",
-                "target": "lead-form.name",
-                "say": "Waiting for the form to close",
+                "type": "navigate",
+                "to": "lead/{{lead_id}}",
+                "say": "Opening the lead",
             },
         ],
     ),
     Action(
-        name="assign_owner",
+        name="open_new_lead_form",
         description=(
-            "Assign a lead to a teammate. Needs the lead id and the teammate's name "
-            "exactly as it appears in the CRM - call list_users if you are unsure."
+            "Open the form for adding a lead, so the user can fill it in. Use this "
+            "when they say they want to add or create a lead. The form is not "
+            "submitted for them."
         ),
-        params=[
-            Param("lead_id", "Id of the lead.", required=True),
-            Param("owner_name", "Teammate's full name, as shown in the CRM.", required=True),
-        ],
-        writes_to_crm=True,
+        params=[],
         steps=[
-            {"type": "navigate", "to": "leads", "say": "Going to the Leads page"},
-            {
-                "type": "click",
-                "target": "leads.row.{{lead_id}}.owner-menu",
-                "say": "Opening the owner menu for {{lead_id}}",
-            },
-            {
-                "type": "waitFor",
-                "target": "owner-menu.{{owner_name}}",
-                "say": "Waiting for the menu",
-            },
-            {
-                "type": "confirm",
-                "message": "Assign lead {{lead_id}} to {{owner_name}}?",
-                "say": "Asking you to confirm",
-            },
-            {
-                "type": "click",
-                "target": "owner-menu.{{owner_name}}",
-                "say": "Picking {{owner_name}}",
-            },
+            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
+            {"type": "click", "target": "leads.add-lead", "say": "Opening the new lead form"},
         ],
     ),
     Action(
         name="read_screen",
         description=(
-            "Read what is currently rendered on screen. Use this before answering a "
-            "question about what the user is looking at, and to get lead ids."
+            "Read what is currently on screen. Use it before answering a question "
+            "about what the user is looking at."
         ),
         params=[
             Param("key", "Which slice of the screen to read.", required=True, enum=READABLE),
@@ -241,6 +146,7 @@ ACTIONS: list[Action] = [
         ],
     ),
 ]
+
 
 ACTIONS_BY_NAME: dict[str, Action] = {a.name: a for a in ACTIONS}
 ACTION_NAMES: frozenset[str] = frozenset(ACTIONS_BY_NAME)

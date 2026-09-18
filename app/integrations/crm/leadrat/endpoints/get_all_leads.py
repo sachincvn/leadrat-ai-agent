@@ -20,6 +20,7 @@ LeadTools.buildLeadSearchFilter does for its own six callers.
 import re
 from typing import Any
 
+from app.core.clock import to_utc_instant
 from app.core.logging import get_logger
 from app.integrations.crm.leadrat.http import LeadratHttp
 from app.integrations.crm.leadrat.lead_sources import code_for, display_name
@@ -45,7 +46,7 @@ def build_body(filters: LeadFilters, page: int = 1, page_size: int = DEFAULT_PAG
         "path": PATH.lstrip("/"),
         "pageNumber": max(page, 1),
         "pageSize": min(page_size if page_size > 0 else DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
-        "CanAccessAllLeads": True,
+        "CanAccessAllLeads": bool(filters.can_access_all_leads),
     }
 
     # Optional filters. Omitted entirely when unset - never sent as "" or null.
@@ -90,11 +91,13 @@ def build_body(filters: LeadFilters, page: int = 1, page_size: int = DEFAULT_PAG
         body["leadTags"] = filters.lead_tags
 
     if filters.date_filters:
+        # A plain date means a day in the tenant's time zone; the backend takes
+        # UTC instants. Sending the bare date matches nothing.
         body["dates"] = [
             {
                 "multiDateType": d.date_type,
-                "multiFromDate": d.from_date,
-                "multiToDate": d.to_date,
+                "multiFromDate": to_utc_instant(d.from_date),
+                "multiToDate": to_utc_instant(d.to_date),
             }
             for d in filters.date_filters
         ]

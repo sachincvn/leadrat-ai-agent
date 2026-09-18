@@ -10,6 +10,7 @@ from app.agent.tools.lead import LEAD_TOOLS
 from app.agent.tools.listing import LISTING_TOOLS
 from app.agent.tools.masterdata import MASTERDATA_TOOLS
 from app.agent.tools.project import PROJECT_TOOLS
+from app.agent.tools.report import REPORT_TOOLS
 from app.agent.tools.property import PROPERTY_TOOLS
 from app.agent.tools.settings import SETTINGS_TOOLS
 from app.agent.tools.user import USER_TOOLS
@@ -22,6 +23,7 @@ TOOLS: list[BaseTool] = [
     *PROPERTY_TOOLS,
     *LISTING_TOOLS,
     *SETTINGS_TOOLS,
+    *REPORT_TOOLS,
     # *TASK_TOOLS,
     # *MEETING_TOOLS,
 ]
