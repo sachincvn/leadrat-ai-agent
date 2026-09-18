@@ -65,7 +65,14 @@ ACTIONS: list[Action] = [
             "somewhere, or before an action that lives on another page."
         ),
         params=[
-            Param("page", "Which page to open.", required=True, enum=PAGES),
+            Param(
+                "page",
+                "Which page to open. The app's own names for some of these "
+                "differ: settings is Global Config, prospects is Data, teams "
+                "is Users, listings is the property listing site.",
+                required=True,
+                enum=PAGES,
+            ),
         ],
         steps=[
             {"type": "navigate", "to": "{{page}}", "say": "Opening {{page}}"},
