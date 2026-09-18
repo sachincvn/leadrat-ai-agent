@@ -154,10 +154,79 @@ def _leads(data: dict) -> list[Block]:
 
 
 def _single_lead(data: dict) -> list[Block]:
-    blocks = _record_list("lead", "Lead", None, [_lead_row(data)])
-    if blocks:
-        blocks.append(_chips("Summarize this lead", "Show this lead's history"))
-    return blocks
+    """One lead asked about by itself gets the whole record, not a row.
+
+    A row is for choosing between leads; this is the screen someone works
+    from, so it carries the contact details, where the lead came from, what
+    they want and what is next.
+    """
+    if not data.get("id"):
+        return []
+
+    return [
+        Block(
+            name="lead_detail",
+            props={
+                "id": data.get("id"),
+                "name": data.get("name"),
+                "status": data.get("status"),
+                "phone": data.get("phone"),
+                "email": data.get("email"),
+                "fields": _details(
+                    ("Source", _join(data.get("source"), data.get("sub_source"))),
+                    ("Owner", data.get("assigned_to")),
+                    ("Location", data.get("location")),
+                    ("Project", data.get("project")),
+                    ("Requirement", data.get("requirement")),
+                    ("Next scheduled", data.get("scheduled_at")),
+                    ("Created", data.get("created_at")),
+                    ("Last updated", data.get("last_modified_at")),
+                ),
+            },
+        ),
+        _chips(
+            "Summarize this lead and what I should do next",
+            "Show this lead's history",
+        ),
+    ]
+
+
+def _history(data: dict) -> list[Block]:
+    """A lead's audit trail as a timeline.
+
+    Each entry is one field changing, so the change itself is the headline -
+    "Status: New to Callback" - with who and when underneath.
+    """
+    entries = []
+    for entry in data.get("history", []):
+        field = entry.get("field_name") or entry.get("action_type") or "Updated"
+        old, new = entry.get("old_value"), entry.get("new_value")
+        if old and new:
+            detail = f"{old} → {new}"
+        else:
+            detail = new or old or ""
+
+        entries.append(
+            {
+                "title": field,
+                "detail": detail,
+                "by": entry.get("updated_by"),
+                "at": entry.get("updated_at"),
+            }
+        )
+
+    if not entries:
+        return []
+    return [
+        Block(
+            name="timeline",
+            props={
+                "title": "Lead history",
+                "total": data.get("total_entries"),
+                "entries": entries,
+            },
+        )
+    ]
 
 
 def _projects(data: dict) -> list[Block]:
@@ -347,6 +416,7 @@ def _report(title: str) -> Callable[[dict], list[Block]]:
 RENDERERS: dict[str, Callable[[dict], list[Block]]] = {
     "search_leads": _leads,
     "get_lead": _single_lead,
+    "get_lead_history": _history,
     "get_lead_counts": _lead_counts,
     "list_projects": _projects,
     "get_project_count": _project_counts,
