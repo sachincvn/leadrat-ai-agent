@@ -669,18 +669,23 @@ ACTIONS: list[Action] = [
     Action(
         name="fill_lead_rotation",
         description=(
-            "Fill the lead rotation settings already on screen. The form "
-            "requires a team, a team name, a team leader, a shift from and to, "
-            "how long a lead waits before it moves on, and how many times it "
-            "may move; the buffer is optional. Pass only what the user gave "
-            "you - anything left out is left alone, so this can be called "
-            "again to fix one field. It reports what is still missing, and it "
-            "does not save."
+            "Fill the lead rotation settings already on screen. Ask the user "
+            "only for the fields they can actually set: the team, the shift "
+            "from and to, how long a lead waits before it moves on, and how "
+            "many times it may move. The team name and team leader come with "
+            "the group and are greyed out - never ask for them, and do not "
+            "pass them. Pass only what the user gave you: anything left out is "
+            "left alone, so this can be called again to fix one field. It "
+            "reports what is still missing, and it does not save."
         ),
         params=[
-            Param("team", "The team the leads are shared across."),
-            Param("team_name", "A name for this rotation group."),
-            Param("team_leader", "Who leads the team, by name."),
+            Param(
+                "team",
+                "The team the leads are shared across, as the dropdown names "
+                "it. Required, and the user has to say which - there is no "
+                "sensible default, and picking one for them assigns other "
+                "people's leads.",
+            ),
             Param(
                 "shift_from",
                 'Start of the shift, with AM or PM: "9:00 AM". The picker is a '
@@ -711,20 +716,6 @@ ACTIONS: list[Action] = [
                 "value": "{{team}}",
                 "optional": True,
                 "say": "Select Team - who the leads go to",
-            },
-            {
-                "type": "fill",
-                "target": "rotation.team-name",
-                "value": "{{team_name}}",
-                "optional": True,
-                "say": "Team Name - what this rotation is called",
-            },
-            {
-                "type": "select",
-                "target": "rotation.team-leader",
-                "value": "{{team_leader}}",
-                "optional": True,
-                "say": "Team Leader - {{team_leader}}",
             },
             {
                 # Not a fill: the field is readonly and only its picker can set

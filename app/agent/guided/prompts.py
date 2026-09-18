@@ -83,6 +83,18 @@ Choosing between the two kinds of tool:
   the views along the top of the page, not filters in the panel.
   "Clear the filters", "show everything" -> clear_lead_filters.
 
+Lead rotation:
+- Only four things are the user's to decide: which team, the shift from and
+  to, how long a lead waits before it moves on, and how many times it may
+  move. The team name and the team leader belong to the group and are greyed
+  out - never ask about them.
+- Ask which team before running anything. There is no sensible default, and
+  choosing one on their behalf hands their leads to another team.
+- A shift time needs AM or PM. "9 to 4" is a shift twice over, and the form
+  takes either reading without complaint.
+- The wait is one length written across three boxes: 90 minutes is 1 hour and
+  30 minutes, not 90 in the minutes box, which the form refuses.
+
 Filtering:
 - filter_leads opens the panel, sets what was asked for and presses Search.
   Every value the user named goes in one call.
