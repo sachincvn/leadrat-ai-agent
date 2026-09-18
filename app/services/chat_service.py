@@ -14,19 +14,22 @@ from app.schemas.chat import ChatRequest, ChatResponse
 from app.services import chat_history_store
 
 
-def _session_key(caller: Caller) -> str:
-    """One conversation per logged-in user per tenant.
+def _session_key(caller: Caller, conversation_id: str | None = None) -> str:
+    """Which conversation a turn belongs to.
 
-    Derived from the caller's own JWT rather than a client-supplied session
-    id, so history works without any change on the client's part - the same
-    identity always resumes the same conversation.
+    The identity half comes from the caller's own JWT rather than anything the
+    client sends, so one user can never read another's history by guessing an
+    id. The conversation half is the client's, which is what lets a user keep
+    several threads and come back to one - a client that sends nothing keeps
+    the single running conversation it always had.
     """
     uid = jwt_user_id(caller.jwt) or caller.jwt
-    return f"{caller.tenant}:{uid}"
+    session = f"{caller.tenant}:{uid}"
+    return f"{session}:{conversation_id}" if conversation_id else session
 
 
 def handle_chat(request: ChatRequest, caller: Caller) -> ChatResponse:
-    session_key = _session_key(caller)
+    session_key = _session_key(caller, request.conversation_id)
     history = chat_history_store.get_history(session_key)
     recent_tool_notes = chat_history_store.get_tool_notes(session_key)
 
@@ -51,7 +54,7 @@ def stream_chat(request: ChatRequest, caller: Caller) -> Iterator[dict]:
     History is written once the turn finishes, exactly as in handle_chat - a
     stream the client abandons half way leaves no half-answer in memory.
     """
-    session_key = _session_key(caller)
+    session_key = _session_key(caller, request.conversation_id)
     history = chat_history_store.get_history(session_key)
     recent_tool_notes = chat_history_store.get_tool_notes(session_key)
 
@@ -63,6 +66,7 @@ def stream_chat(request: ChatRequest, caller: Caller) -> Iterator[dict]:
             lead_id=request.lead_id,
             history=history,
             recent_tool_notes=recent_tool_notes,
+            renders_blocks=request.renders_blocks,
         ),
     )
     for event in events:
@@ -78,5 +82,5 @@ def stream_chat(request: ChatRequest, caller: Caller) -> Iterator[dict]:
             yield {"type": event.kind, **event.data}
 
 
-def clear_chat_history(caller: Caller) -> None:
-    chat_history_store.clear(_session_key(caller))
+def clear_chat_history(caller: Caller, conversation_id: str | None = None) -> None:
+    chat_history_store.clear(_session_key(caller, conversation_id))

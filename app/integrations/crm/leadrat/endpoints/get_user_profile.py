@@ -65,3 +65,28 @@ def get_user_profile(http: LeadratHttp, user_id: str) -> UserProfile:
     row = extract_data(payload)
     log.info("get_user_profile(%s) -> %s", user_id, "found" if row else "empty")
     return to_profile(row)
+
+
+def extract_permissions(row: dict) -> set[str]:
+    """The flat permission set behind a profile's roles.
+
+    Shaped like rolePermission[].permissions[] - the same place Leadrat's MCP
+    server reads, so "Permissions.Leads.ViewAllLeads" and friends mean exactly
+    what they mean there.
+    """
+    permissions: set[str] = set()
+    for role in row.get("rolePermission") or []:
+        if not isinstance(role, dict):
+            continue
+        for permission in role.get("permissions") or []:
+            if isinstance(permission, str):
+                permissions.add(permission)
+    return permissions
+
+
+def get_user_permissions(http: LeadratHttp, user_id: str) -> set[str]:
+    """Just the caller's permissions, for the checks that gate a lead request."""
+    row = extract_data(http.get(PATH.format(id=user_id)))
+    permissions = extract_permissions(row)
+    log.info("get_user_permissions(%s) -> %d permission(s)", user_id, len(permissions))
+    return permissions

@@ -41,8 +41,9 @@ def _sse(events: Iterator[dict]) -> Iterator[str]:
 def chat_stream(request: ChatRequest, caller: CallerDep) -> StreamingResponse:
     """The same answer as POST /chat, streamed as it is written.
 
-    Events: `status` (a tool is running), `text` (append to the answer),
-    `done` (with tools_used), `error`.
+    Events: `status` (a tool is running), `block` (a renderable block built
+    from a tool result), `text` (append to the answer), `done` (with
+    tools_used), `error`.
     """
     return StreamingResponse(
         _sse(stream_chat(request, caller)),
@@ -52,7 +53,7 @@ def chat_stream(request: ChatRequest, caller: CallerDep) -> StreamingResponse:
 
 
 @router.delete("/history")
-def clear_history(caller: CallerDep) -> dict:
-    """Forget this caller's conversation so far - the next message starts fresh."""
-    clear_chat_history(caller)
+def clear_history(caller: CallerDep, conversation_id: str | None = None) -> dict:
+    """Forget one of this caller's conversations, or the unnamed one."""
+    clear_chat_history(caller, conversation_id)
     return {"cleared": True}

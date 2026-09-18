@@ -89,6 +89,11 @@ class LeadFilters(BaseModel):
     see `agent/tools/lead/_resolvers.py`.
     """
 
+    # Sent on every lead request. Whether the caller may see the whole tenant's
+    # leads is the backend's decision, derived from their role permissions -
+    # the agent never sets it, and it is not a filter the user can ask for.
+    can_access_all_leads: bool = False
+
     # free text / pagination
     keyword: str | None = None
     limit: int = 10

@@ -23,10 +23,12 @@ from app.agent.tools.lead.get_lead import get_lead
 from app.agent.tools.lead.get_lead_counts import get_lead_counts
 from app.agent.tools.lead.get_lead_history import get_lead_history
 from app.agent.tools.lead.search_leads import search_leads
+from app.agent.tools.lead.summarize_lead import summarize_lead
 
 LEAD_TOOLS: list[BaseTool] = [
     get_lead,
     search_leads,
     get_lead_counts,
     get_lead_history,
+    summarize_lead,
 ]
