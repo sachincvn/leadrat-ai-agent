@@ -39,7 +39,11 @@ class Settings(BaseSettings):
     # Tool-capable and on Groq's free tier. openai/gpt-oss-20b and
     # qwen/qwen3-32b also call tools; llama-3.1-8b-instant is faster and worse
     # at picking arguments.
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
+    # gpt-oss thinks before it answers. "low" is enough here - which tool to
+    # call is decided by the prompt, not by deliberation - and the reasoning is
+    # kept out of the reply entirely rather than streamed at the user.
+    groq_reasoning_effort: str = "low"
     groq_base_url: str = "https://api.groq.com/openai/v1"
 
     # agent

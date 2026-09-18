@@ -26,6 +26,16 @@ class GroqProvider(LLMProvider):
         if not settings.groq_api_key:
             raise LLMError("GROQ_API_KEY is not set")
 
+        extra_body: dict = {}
+        if settings.groq_model.startswith("openai/gpt-oss"):
+            # Reasoning tokens are spent from the same max_tokens budget as the
+            # answer, and arrive in the reply unless told otherwise. Hiding
+            # them keeps a chain of thought off the user's screen, and keeping
+            # the effort low keeps the budget for the answer - tool selection
+            # here is a prompt decision, not something to deliberate over.
+            extra_body["reasoning_format"] = "hidden"
+            extra_body["reasoning_effort"] = settings.groq_reasoning_effort
+
         return ChatOpenAI(
             model=settings.groq_model,
             base_url=settings.groq_base_url,
@@ -34,4 +44,5 @@ class GroqProvider(LLMProvider):
             max_tokens=settings.llm_max_tokens,
             timeout=settings.llm_timeout,
             max_retries=1,
+            extra_body=extra_body or None,
         )
