@@ -1,10 +1,11 @@
-"""In-memory conversation history, keyed by session (tenant + user).
+"""In-memory conversation history, keyed by session (tenant + user + thread).
 
 Process-local: fine for a single backend instance / a prototype like this
 one. Swap the dict for Redis or a DB table if this needs to survive
 restarts, or run across more than one backend process.
 """
 
+from collections import OrderedDict
 from threading import Lock
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
@@ -18,9 +19,22 @@ MAX_MESSAGES = 20
 # second one?" while keeping the prompt small.
 MAX_NOTE_TURNS = 2
 
-_store: dict[str, list[BaseMessage]] = {}
+# Sessions held at once, across every user. Each client keeps several named
+# conversations, so without a bound this dict would grow for as long as the
+# process lives. The least recently written one goes first; a client that
+# comes back to an evicted conversation still has its own transcript, and the
+# model simply starts that thread fresh.
+MAX_SESSIONS = 500
+
+_store: OrderedDict[str, list[BaseMessage]] = OrderedDict()
 _notes: dict[str, list[list[str]]] = {}
 _lock = Lock()
+
+
+def _evict_oldest() -> None:
+    while len(_store) > MAX_SESSIONS:
+        oldest, _ = _store.popitem(last=False)
+        _notes.pop(oldest, None)
 
 
 def get_history(session_key: str) -> list[BaseMessage]:
@@ -50,6 +64,8 @@ def append_turn(
         history.append(AIMessage(answer))
         if len(history) > MAX_MESSAGES:
             del history[: len(history) - MAX_MESSAGES]
+        _store.move_to_end(session_key)
+        _evict_oldest()
 
 
 def clear(session_key: str) -> None:

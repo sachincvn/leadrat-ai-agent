@@ -53,7 +53,7 @@ def chat_stream(request: ChatRequest, caller: CallerDep) -> StreamingResponse:
 
 
 @router.delete("/history")
-def clear_history(caller: CallerDep) -> dict:
-    """Forget this caller's conversation so far - the next message starts fresh."""
-    clear_chat_history(caller)
+def clear_history(caller: CallerDep, conversation_id: str | None = None) -> dict:
+    """Forget one of this caller's conversations, or the unnamed one."""
+    clear_chat_history(caller, conversation_id)
     return {"cleared": True}
