@@ -13,8 +13,71 @@ it did not do.
 Placeholders `{{param}}` are filled by resolver.resolve().
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
+import re
 from typing import Any
+
+# --- value checks the form itself enforces ------------------------------------
+
+# Angular's own validators on the rotation form: days 0-365, hours 0-23,
+# minutes 0-59, and a rotation count the dropdown actually offers. Checking
+# them here means the model is told what is wrong while it can still fix it,
+# rather than the walkthrough typing a value the form then rejects in red.
+MAX_ROTATION_DAYS = 365
+MAX_ROTATIONS = 10
+
+_TIME = re.compile(r"^(\d{1,2})(?::([0-5]\d))?\s*(am|pm)?$", re.IGNORECASE)
+
+
+def _whole_number(value: str, *, low: int, high: int, unit: str) -> str | None:
+    if not value.strip().lstrip("+").isdigit():
+        return f'"{value}" is not a whole number of {unit}'
+    number = int(value)
+    if not low <= number <= high:
+        return f"{unit} must be between {low} and {high} (got {number})"
+    return None
+
+
+def _check_time(value: str) -> str | None:
+    """A time the picker can actually be set to.
+
+    The field is a 12-hour picker, so a bare "9" is ambiguous in the one way
+    that matters: nine in the morning and nine at night are both plausible
+    shift boundaries, and the form will accept whichever it is given. Asking
+    for the meridiem is cheaper than a shift saved twelve hours out.
+    """
+    match = _TIME.match(value.strip())
+    if not match:
+        return f'"{value}" is not a time - give it as "9:00 AM" or "18:30"'
+
+    hour = int(match.group(1))
+    meridiem = match.group(3)
+    if meridiem:
+        if not 1 <= hour <= 12:
+            return f'"{value}" is not a time - with AM or PM the hour is 1 to 12'
+    elif hour > 23:
+        return f'"{value}" is not a time - the hour is 0 to 23'
+    elif hour <= 12:
+        return f'"{value}" could be morning or evening - say AM or PM'
+    return None
+
+
+def _check_days(value: str) -> str | None:
+    return _whole_number(value, low=0, high=MAX_ROTATION_DAYS, unit="days")
+
+
+def _check_hours(value: str) -> str | None:
+    return _whole_number(value, low=0, high=23, unit="hours")
+
+
+def _check_minutes(value: str) -> str | None:
+    return _whole_number(value, low=0, high=59, unit="minutes")
+
+
+def _check_rotations(value: str) -> str | None:
+    return _whole_number(value, low=1, high=MAX_ROTATIONS, unit="rotations")
+
 
 # Every page an action may send the user to. A name here must be one the web
 # client can route - see the client's own page map.
@@ -53,6 +116,12 @@ class Param:
     description: str
     required: bool = False
     enum: tuple[str, ...] | None = None
+    # Checked before a plan is built, for values an enum cannot express - a
+    # time, a count, a number within a range. Returns the problem in the words
+    # the model should hear, or None when the value is fine. A form that
+    # rejects a value after the walkthrough has typed it wastes the run and
+    # leaves the screen half filled.
+    check: Callable[[str], str | None] | None = None
 
 
 @dataclass(frozen=True)
@@ -612,12 +681,27 @@ ACTIONS: list[Action] = [
             Param("team", "The team the leads are shared across."),
             Param("team_name", "A name for this rotation group."),
             Param("team_leader", "Who leads the team, by name."),
-            Param("shift_from", "Start of the shift, as the field wants it, e.g. 09:00."),
-            Param("shift_to", "End of the shift, e.g. 18:00."),
-            Param("rotation_days", "Days a lead waits before it rotates. Digits only."),
-            Param("rotation_hours", "Hours a lead waits. Digits only."),
-            Param("rotation_minutes", "Minutes a lead waits. Digits only."),
-            Param("rotations", "How many times a lead may rotate."),
+            Param(
+                "shift_from",
+                'Start of the shift, with AM or PM: "9:00 AM". The picker is a '
+                "12-hour one, so a bare hour is ambiguous and is refused.",
+                check=_check_time,
+            ),
+            Param("shift_to", 'End of the shift, with AM or PM: "6:00 PM".', check=_check_time),
+            Param(
+                "rotation_days",
+                "Days a lead waits before it rotates, 0 to 365. Days, hours and "
+                "minutes add up to one wait - 90 minutes is 1 hour 30 minutes, "
+                "not 90 in the minutes box.",
+                check=_check_days,
+            ),
+            Param("rotation_hours", "Hours a lead waits, 0 to 23.", check=_check_hours),
+            Param("rotation_minutes", "Minutes a lead waits, 0 to 59.", check=_check_minutes),
+            Param(
+                "rotations",
+                "How many times a lead may rotate, 1 to 10.",
+                check=_check_rotations,
+            ),
             Param("buffer_minutes", "Optional buffer in minutes between rotations."),
         ],
         steps=[
@@ -643,14 +727,16 @@ ACTIONS: list[Action] = [
                 "say": "Team Leader - {{team_leader}}",
             },
             {
-                "type": "fill",
+                # Not a fill: the field is readonly and only its picker can set
+                # it, so typing into it changes nothing and reports success.
+                "type": "setTime",
                 "target": "rotation.shift-from",
                 "value": "{{shift_from}}",
                 "optional": True,
                 "say": "Shift starts at {{shift_from}}",
             },
             {
-                "type": "fill",
+                "type": "setTime",
                 "target": "rotation.shift-to",
                 "value": "{{shift_to}}",
                 "optional": True,

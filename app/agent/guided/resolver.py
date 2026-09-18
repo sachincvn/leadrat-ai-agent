@@ -96,6 +96,13 @@ def validate(action: Action, raw: dict[str, Any]) -> tuple[dict[str, str], str |
             problems.append(f'"{key}" must be one of: {", ".join(param.enum)} (got "{text}")')
             already_faulted.add(key)
             continue
+        # A value the form itself would reject: caught here, while the model
+        # can still correct it, rather than after the walkthrough has typed it.
+        fault = param.check(text) if param.check else None
+        if fault:
+            problems.append(f'"{key}": {fault}')
+            already_faulted.add(key)
+            continue
         cleaned[key] = text
 
     for param in action.params:
