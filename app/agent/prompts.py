@@ -134,6 +134,15 @@ narrows what is on screen rather than starting a fresh unfiltered search:
 {data}
 """
 
+# Compresses a finished answer into a short spoken line for a client that
+# plays the reply back as audio. A separate, one-off prompt rather than
+# asking the main agent for both forms at once - see app/agent/runner.py's
+# to_voice_message, which only calls this on the answer once a turn ends.
+VOICE_SYSTEM_PROMPT = """Rewrite the given CRM assistant reply as a short, \
+natural-sounding spoken line - one or two plain sentences carrying only the \
+single most important point. Same meaning, no lists, no markdown, no ids, \
+no extra detail. Sound like a person speaking it aloud, not a written report."""
+
 # ------------------------------------------------------- single-lead chat
 #
 # Used by the stateless POST /leads/{lead_id}/chat endpoint: one lead's

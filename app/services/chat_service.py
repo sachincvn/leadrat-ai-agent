@@ -45,7 +45,11 @@ def handle_chat(request: ChatRequest, caller: Caller) -> ChatResponse:
     chat_history_store.append_turn(
         session_key, request.message, result.answer, result.tool_notes
     )
-    return ChatResponse(answer=result.answer, tools_used=result.tools_used)
+    return ChatResponse(
+        answer=result.answer,
+        voice_message=result.voice_message,
+        tools_used=result.tools_used,
+    )
 
 
 def stream_chat(request: ChatRequest, caller: Caller) -> Iterator[dict]:
@@ -77,7 +81,11 @@ def stream_chat(request: ChatRequest, caller: Caller) -> Iterator[dict]:
                 event.data["answer"],
                 event.data["tool_notes"],
             )
-            yield {"type": "done", "tools_used": event.data["tools_used"]}
+            yield {
+                "type": "done",
+                "voice_message": event.data["voice_message"],
+                "tools_used": event.data["tools_used"],
+            }
         else:
             yield {"type": event.kind, **event.data}
 
