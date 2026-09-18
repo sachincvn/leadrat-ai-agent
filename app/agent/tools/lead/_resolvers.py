@@ -15,6 +15,7 @@ MeetingOrVisitCompletionStatus and LeadDateType), so the integer codes here
 are exact, not guessed.
 """
 
+from app.core.clock import resolve_range, resolve_relative_date
 from app.core.context import get_jwt
 from app.core.jwt_claims import user_id as jwt_user_id
 from app.core.logging import get_logger
@@ -130,8 +131,39 @@ def resolve_source_codes(names: list[str] | None) -> list[int] | None:
     return codes or None
 
 
+def _resolve_dates(from_date: str, to_date: str) -> tuple[str, str]:
+    """Replace any relative word with a real date off the server's clock.
+
+    The prompt tells the model today's date, but a model that writes "today" or
+    "this month" into a filter anyway must not reach the CRM with it. An ISO
+    date the model worked out itself is passed through untouched - it is the
+    one form we cannot second-guess.
+    """
+    if from_date.strip().lower() == to_date.strip().lower():
+        span = resolve_range(from_date)
+        if span:
+            return span
+
+    start = resolve_relative_date(from_date)
+    if start is None:
+        span = resolve_range(from_date)
+        start = span[0] if span else from_date
+
+    end = resolve_relative_date(to_date)
+    if end is None:
+        span = resolve_range(to_date)
+        end = span[1] if span else to_date
+
+    return start, end
+
+
 def parse_date_filters(entries: list[dict] | None) -> list[LeadDateFilter] | None:
-    """entries: [{"date_type": "ReceivedDate", "from_date": "2026-06-23", "to_date": "2026-06-23"}, ...]"""
+    """entries: [{"date_type": "ReceivedDate", "from_date": "2026-06-23", "to_date": "2026-06-23"}, ...]
+
+    from_date/to_date are ISO dates, or a relative word ("today", "this month")
+    resolved here against the server clock - never against the model's idea of
+    what day it is.
+    """
     if not entries:
         return None
     parsed: list[LeadDateFilter] = []
@@ -139,6 +171,8 @@ def parse_date_filters(entries: list[dict] | None) -> list[LeadDateFilter] | Non
         date_type = entry.get("date_type") or entry.get("dateType")
         from_date = entry.get("from_date") or entry.get("fromDate")
         to_date = entry.get("to_date") or entry.get("toDate")
+        if date_type and from_date and not to_date:
+            to_date = from_date  # a single day sent with only one end
         if not (date_type and from_date and to_date):
             log.warning("Incomplete date filter %s - ignored", entry)
             continue
@@ -146,7 +180,10 @@ def parse_date_filters(entries: list[dict] | None) -> list[LeadDateFilter] | Non
         if code is None:
             log.warning("Unrecognised date field '%s' - ignored", date_type)
             continue
-        parsed.append(LeadDateFilter(date_type=code, from_date=from_date, to_date=to_date))
+        start, end = _resolve_dates(str(from_date), str(to_date))
+        if (start, end) != (from_date, to_date):
+            log.info("Date filter %s..%s resolved to %s..%s", from_date, to_date, start, end)
+        parsed.append(LeadDateFilter(date_type=code, from_date=start, to_date=end))
     return parsed or None
 
 

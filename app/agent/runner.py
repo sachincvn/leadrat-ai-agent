@@ -7,10 +7,16 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, System
 
 from app.agent.llm import get_llm
 from app.agent.llm.errors import describe_llm_failure
-from app.agent.prompts import RECENT_DATA_SUFFIX, SELECTED_LEAD_SUFFIX, SYSTEM_PROMPT
+from app.agent.prompts import (
+    RECENT_DATA_SUFFIX,
+    SELECTED_LEAD_SUFFIX,
+    SYSTEM_PROMPT,
+    TODAY_SUFFIX,
+)
 from app.agent.sanitize import strip_internal_ids
 from app.agent.streaming import SafeAnswerStream
 from app.agent.tools import TOOLS, TOOLS_BY_NAME
+from app.core.clock import describe_today, today_iso
 from app.core.config import settings
 from app.core.exceptions import LLMError
 from app.core.logging import get_logger
@@ -75,7 +81,9 @@ def _build_messages(
     history: list[BaseMessage] | None,
     recent_tool_notes: list[str] | None,
 ) -> list[BaseMessage]:
-    system = SYSTEM_PROMPT
+    system = SYSTEM_PROMPT + TODAY_SUFFIX.format(
+        today=describe_today(), today_iso=today_iso()
+    )
     if lead_id:
         system += SELECTED_LEAD_SUFFIX.format(lead_id=lead_id)
     if recent_tool_notes:
