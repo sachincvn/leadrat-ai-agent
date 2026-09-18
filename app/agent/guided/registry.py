@@ -21,10 +21,18 @@ from typing import Any
 PAGES = (
     "dashboard",
     "leads",
+    "prospects",
     "projects",
     "properties",
+    "listings",
     "tasks",
     "reports",
+    "teams",
+    "attendance",
+    "invoice",
+    "whatsapp",
+    "settings",
+    "profile",
 )
 READABLE = ("visible_leads", "current_page", "lead_form")
 
