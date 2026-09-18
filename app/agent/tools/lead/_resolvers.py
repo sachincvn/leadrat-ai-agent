@@ -16,8 +16,11 @@ are exact, not guessed.
 """
 
 from app.core.clock import resolve_range, resolve_relative_date
+from uuid import UUID
+
 from app.core.context import get_jwt
 from app.core.jwt_claims import user_id as jwt_user_id
+from app.core.jwt_claims import user_name as jwt_user_name
 from app.core.logging import get_logger
 from app.integrations.crm.factory import get_crm_client
 from app.integrations.crm.leadrat.lead_sources import codes_for as source_codes_for
@@ -187,6 +190,51 @@ def parse_date_filters(entries: list[dict] | None) -> list[LeadDateFilter] | Non
     return parsed or None
 
 
+def _is_guid(value: str) -> bool:
+    try:
+        UUID(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _my_user_id() -> str | None:
+    """The caller's own user GUID.
+
+    Tokens differ by tenant: some carry the GUID in a claim, others carry only
+    a login name like "surya_sachin". A name cannot go into assignTo - the
+    field is typed System.Guid and the whole request fails with a 400, not just
+    that filter - so a name is looked up in the tenant's user directory and
+    turned into the GUID it stands for.
+    """
+    jwt = get_jwt()
+    if not jwt:
+        log.warning("Could not resolve 'me' - no caller JWT on this request")
+        return None
+
+    my_id = jwt_user_id(jwt)
+    if my_id:
+        return my_id
+
+    login = jwt_user_name(jwt)
+    if not login:
+        log.warning("Could not resolve 'me' - the caller's JWT carries neither a user id nor a name")
+        return None
+
+    handle = login.split("@")[0].strip().lower()
+    for user in get_crm_client().list_users():
+        candidates = [
+            (user.user_name or "").strip().lower(),
+            f"{user.first_name or ''} {user.last_name or ''}".strip().lower(),
+        ]
+        if handle in candidates and _is_guid(user.id):
+            log.info("Resolved 'me' to %s via the user directory", user.user_name)
+            return user.id
+
+    log.warning("Could not resolve 'me' - no user in the directory matches '%s'", login)
+    return None
+
+
 def resolve_user_ids(names: list[str] | None) -> list[str] | None:
     """Name -> user GUID, with "me" resolved from the caller's own JWT."""
     if not names:
@@ -195,12 +243,9 @@ def resolve_user_ids(names: list[str] | None) -> list[str] | None:
     remaining: list[str] = []
     for name in names:
         if name.strip().lower() == "me":
-            jwt = get_jwt()
-            my_id = jwt_user_id(jwt) if jwt else None
+            my_id = _my_user_id()
             if my_id:
                 ids.append(my_id)
-            else:
-                log.warning("Could not resolve 'me' - no user id in the caller's JWT")
         else:
             remaining.append(name)
 
@@ -217,7 +262,12 @@ def resolve_user_ids(names: list[str] | None) -> list[str] | None:
             ids.extend(matched)
 
     ids = list(dict.fromkeys(ids))  # de-dupe, keep order
-    return ids or None
+    # Last line of defence: Leadrat types these fields System.Guid, and one bad
+    # value 400s the entire request rather than being ignored.
+    valid = [i for i in ids if _is_guid(i)]
+    for bad in set(ids) - set(valid):
+        log.warning("Dropping user id '%s' - not a GUID", bad)
+    return valid or None
 
 
 def resolve_status_ids(names: list[str] | None, sub_status: bool = False) -> list[str] | None:
@@ -311,6 +361,19 @@ def build_lead_filters(
     """
     from app.schemas.lead import LeadFilters  # local import - avoids a cycle at module load
 
+    assigned_ids = resolve_user_ids(assigned_to_names)
+    secondary_ids = resolve_user_ids(secondary_user_names)
+    owner = parse_code(OWNER_SELECTION, owner_selection)
+    if owner is None and assigned_ids and not secondary_ids:
+        # "my leads" / "Darshan's leads" is an ownership question, not a claim
+        # about which slot the person sits in. Leaving this unset lets the
+        # backend answer on the primary owner alone, which silently hides every
+        # lead the person owns as secondary - the same ask against the Leadrat
+        # MCP server returns them, because its tool contract makes the model
+        # send Both. A small model does not reliably do that, so the default
+        # lives here instead of in the prompt.
+        owner = OWNER_SELECTION["both"]
+
     return LeadFilters(
         keyword=keyword or None,
         limit=max(1, min(limit, 500)),
@@ -321,9 +384,9 @@ def build_lead_filters(
         date_filters=parse_date_filters(date_filters),
         min_budget=min_budget,
         max_budget=max_budget,
-        assigned_to_ids=resolve_user_ids(assigned_to_names),
-        owner_selection=parse_code(OWNER_SELECTION, owner_selection),
-        secondary_user_ids=resolve_user_ids(secondary_user_names),
+        assigned_to_ids=assigned_ids,
+        owner_selection=owner,
+        secondary_user_ids=secondary_ids,
         status_ids=resolve_status_ids(status_names, sub_status=False),
         sub_status_ids=resolve_status_ids(sub_status_names, sub_status=True),
         property_type_ids=resolve_property_type_ids(property_type_names, sub_type=False),
