@@ -480,7 +480,20 @@ ACTIONS: list[Action] = [
                 "target": "lead-filter.owner",
                 "value": "{{owner}}",
                 "optional": True,
-                "say": "Assigning filter to {{owner}}",
+                "say": "Assigned To - whose leads these are",
+            },
+            {
+                # A lead has a primary and a secondary owner, and the panel
+                # filters on the primary one unless told otherwise - so asking
+                # for someone's leads misses the ones they share.
+                "type": "select",
+                "target": "lead-filter.owner-scope",
+                "value": "Both",
+                "optional": True,
+                # Naming {{owner}} here is what ties this step to that one:
+                # an optional step whose placeholders are unfilled is skipped,
+                # so this runs only when an owner was actually asked for.
+                "say": "Both owners, so {{owner}}'s shared leads count too",
             },
             {"type": "click", "target": "lead-filter.apply", "say": "Search - applies everything set above"},
             {"type": "readState", "key": "visible_leads", "say": "Reading the rows that came back"},
