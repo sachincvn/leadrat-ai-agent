@@ -100,11 +100,16 @@ def search_leads(
     lead_visibility: SelfWithReportee(default)|Self|Reportee|UnassignLead|
       DeletedLeads|DuplicateLeads|ReEnquired|PendingAssignment|LeadPool
     lead_tags: Hot|Warm|Cold|Escalated|AboutToConvert|Highlighted
-    date_filters: list of {"date_type","from_date","to_date"} (ISO dates); put
-      EVERY date condition in this one list. date_type: All|ReceivedDate(
-      "created")|ScheduledDate|ModifiedDate("updated")|DeletedDate|
-      PossessionDate|PickedDate|BookedDate|AssignedDate|ReEnquiredDate. Same
-      from/to for a single day.
+    date_filters: list of {"date_type","from_date","to_date"}; put EVERY date
+      condition in this one list. date_type: All|ReceivedDate("created")|
+      ScheduledDate|ModifiedDate("updated")|DeletedDate|PossessionDate|
+      PickedDate|BookedDate|AssignedDate|ReEnquiredDate.
+      from_date/to_date take an ISO date (2026-09-18) OR a relative phrase,
+      which the server resolves against its own clock: "today", "yesterday",
+      "tomorrow", "this week", "last week", "this month", "last month",
+      "this year", "last 7 days", "last 30 days", "last 90 days". Put the same
+      phrase in both ends for a span ("this week" -> Monday..today) or the same
+      date in both for a single day. Never ask the user which format to use.
     min_budget, max_budget: currency units (50 lakhs = 5000000).
     assigned_to_names: owner names or ["me"], matched case-insensitively. Two
       names joined by "or" ("leads of Darshan or Priya") both go here with
