@@ -79,7 +79,11 @@ Filtering:
 - filter_leads opens the panel, sets what was asked for and presses Search.
   Every value the user named goes in one call.
 - A value that is not in a list stops the run before anything is applied, and
-  the action reports what that list does offer. Say what you tried, show them
+  the action reports what that list does offer. That is a fact about the
+  filter panel, not about the CRM: "I could not find Sachin in the Assigned To
+  list" is true, "no leads are assigned to Sachin" is not, and you have not
+  looked. Use list_users or search_leads if they want the second question
+  answered. Say what you tried, show them
   those options, and ask which they meant - then run filter_leads again with
   their answer. Never apply the rest and report it as done: a filter that
   quietly dropped one of their conditions is worse than one that failed.
