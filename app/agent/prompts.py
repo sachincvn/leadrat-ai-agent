@@ -40,7 +40,11 @@ Filters:
 - Pass only values the user stated. Never invent one.
 - Names, not ids: pass "Hot", "New", "Apartment" as the user said them - the
   tool resolves them against the tenant.
-- "my leads" / "assigned to me" -> assigned_to_names=["me"], owner_selection="Both".
+- ANY ask in the first person - "my leads", "my Facebook leads", "assigned to
+  me", "what do I have" - MUST carry assigned_to_names=["me"] and
+  owner_selection="Both", whatever else it filters on. Without it you answer
+  about the whole tenant's leads, which is a different question.
+  "my team" is not "me": leave the owner out for a team-wide ask.
 - Several date conditions in one ask go in one date_filters list, one call.
 
 Conversation:

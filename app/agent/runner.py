@@ -17,6 +17,7 @@ from app.agent.prompts import (
     TODAY_SUFFIX,
 )
 from app.agent.sanitize import strip_internal_ids
+from app.agent.scoping import scope_to_caller
 from app.agent.streaming import SafeAnswerStream
 from app.agent.tools import TOOLS, TOOLS_BY_NAME
 from app.core.clock import describe_today, today_iso
@@ -179,6 +180,7 @@ def run_agent(
 
         messages.append(reply)
         for call in tool_calls:
+            call = scope_to_caller(message, call)
             output = _run_tool(call, failures)
             if call["name"] in TOOLS_BY_NAME:
                 tools_used.append(call["name"])
@@ -294,6 +296,7 @@ def stream_agent(
         # A tool-calling step: nothing shown so far belongs in the answer.
         messages.append(reply)
         for call in tool_calls:
+            call = scope_to_caller(message, call)
             yield StreamEvent("status", tool=call["name"])
             output = _run_tool(call, failures)
             if call["name"] in TOOLS_BY_NAME:
