@@ -146,7 +146,13 @@ ACTIONS: list[Action] = [
         ),
         params=[
             Param("name", "Full name of the lead."),
-            Param("phone", "Contact number, digits as the user gave them."),
+            Param(
+                "phone",
+                "Contact number. Include the country code with a + when the "
+                "user names a country - '+91 9898989834' - because the field "
+                "reads the country off the number itself. Digits alone are "
+                "taken as the country the form is already set to.",
+            ),
             Param("email", "Email address."),
             Param("source", "Where the lead came from, e.g. Referral, Walk In."),
         ],
