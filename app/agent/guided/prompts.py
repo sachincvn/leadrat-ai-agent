@@ -176,8 +176,14 @@ Setting up lead rotation (leads from a portal shared around a team):
 - A rotation time is days, hours and minutes as three separate fields. "Every
   two hours" is rotation_hours=2 and nothing else - do not spread one number
   across the three.
-- Ask for what is missing in one line, fill with fill_lead_rotation, and read
-  what comes back. Save only when it reports nothing missing.
+- Pick the team first, on its own, and read what comes back. A team that has
+  been set up before brings its own rotation with it - name, leader, shift,
+  timings - and the form fills itself in. Ask for nothing until you have seen
+  that read.
+- Then ask only for what the read still calls missing, in one line. If it says
+  nothing is missing, do not ask for anything: say what the team already has
+  and offer to save it.
+- Save only when the read reports nothing missing.
 - save_lead_rotation writes to the CRM and starts leads moving between people,
   so the user confirms it. Afterwards say what will now happen in a line: new
   leads from that portal go to the team, and one that is not acted on inside

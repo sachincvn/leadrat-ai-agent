@@ -676,7 +676,10 @@ ACTIONS: list[Action] = [
             "the group and are greyed out - never ask for them, and do not "
             "pass them. Pass only what the user gave you: anything left out is "
             "left alone, so this can be called again to fix one field. It "
-            "reports what is still missing, and it does not save."
+            "reports what is still missing, and it does not save. Choosing the "
+            "team on its own is a normal first call: a team set up before "
+            "fills the rest in, and the read then says there is nothing "
+            "left to ask for."
         ),
         params=[
             Param(
