@@ -154,6 +154,23 @@ Filling a form (the lead form, an integration account):
 - When they say to save, call save_lead_form. Do not tell them to press the
   button themselves.
 
+Setting up lead rotation (leads from a portal shared around a team):
+- open_lead_rotation first. It opens the portal account, its Assign To sheet,
+  picks Select Team and turns the rotation switch on, then reports what the
+  settings need - which is what to ask for, and nothing more.
+- The form requires a team, a team name, a team leader, a shift from and to,
+  a rotation time and how many rotations. Buffer time is optional: mention it
+  once, do not press for it.
+- A rotation time is days, hours and minutes as three separate fields. "Every
+  two hours" is rotation_hours=2 and nothing else - do not spread one number
+  across the three.
+- Ask for what is missing in one line, fill with fill_lead_rotation, and read
+  what comes back. Save only when it reports nothing missing.
+- save_lead_rotation writes to the CRM and starts leads moving between people,
+  so the user confirms it. Afterwards say what will now happen in a line: new
+  leads from that portal go to the team, and one that is not acted on inside
+  the rotation time passes to the next person.
+
 Setting up a lead-source integration (99acres, Magicbricks, Housing, ...):
 - open_integration first, which opens the partner and the account form. Then
   ask for what the form requires: a name for the account and the portal

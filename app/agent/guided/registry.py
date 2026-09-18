@@ -43,6 +43,7 @@ READABLE = (
     "lead_form",
     "lead_saved",
     "integration_form",
+    "rotation_form",
 )
 
 
@@ -538,6 +539,190 @@ ACTIONS: list[Action] = [
             },
             {"type": "click", "target": "lead-filter.reset", "say": "Reset - clears every filter at once"},
             {"type": "readState", "key": "visible_leads", "say": "Reading the full list"},
+        ],
+    ),
+    Action(
+        name="open_lead_rotation",
+        description=(
+            "Open lead rotation for a portal account: the integration, its "
+            "Assign To sheet, Select Team, and the rotation switch turned on, "
+            "so the settings are on screen. Use it when the user wants leads "
+            "from a portal shared out across a team automatically. Then use "
+            "fill_lead_rotation."
+        ),
+        params=[
+            Param(
+                "partner",
+                "The integration as the card names it: 99acres, Magicbricks, "
+                "Housing.",
+                required=True,
+            ),
+        ],
+        steps=[
+            {"type": "navigate", "to": "settings", "say": "Global Config, in the menu on the left"},
+            {
+                "type": "click",
+                "target": "integration.{{partner}}",
+                "say": "Connect Now on the {{partner}} card",
+            },
+            {
+                "type": "click",
+                "target": "integration.assign-to",
+                "say": "Assign To, on the account row",
+            },
+            {
+                "type": "waitFor",
+                "target": "assignment.select-team",
+                "say": "Waiting for the assignment sheet",
+            },
+            {
+                "type": "click",
+                "target": "assignment.select-team",
+                "say": "Select Team - rotation shares leads across a team, not one person",
+            },
+            {
+                "type": "click",
+                "target": "rotation.switch",
+                "say": "Lead Rotation, on - its settings appear underneath",
+            },
+            {
+                "type": "waitFor",
+                "target": "rotation.team-name",
+                "say": "Waiting for the rotation settings",
+            },
+            {
+                "type": "readState",
+                "key": "rotation_form",
+                "say": "Reading what rotation needs",
+            },
+        ],
+    ),
+    Action(
+        name="fill_lead_rotation",
+        description=(
+            "Fill the lead rotation settings already on screen. The form "
+            "requires a team, a team name, a team leader, a shift from and to, "
+            "how long a lead waits before it moves on, and how many times it "
+            "may move; the buffer is optional. Pass only what the user gave "
+            "you - anything left out is left alone, so this can be called "
+            "again to fix one field. It reports what is still missing, and it "
+            "does not save."
+        ),
+        params=[
+            Param("team", "The team the leads are shared across."),
+            Param("team_name", "A name for this rotation group."),
+            Param("team_leader", "Who leads the team, by name."),
+            Param("shift_from", "Start of the shift, as the field wants it, e.g. 09:00."),
+            Param("shift_to", "End of the shift, e.g. 18:00."),
+            Param("rotation_days", "Days a lead waits before it rotates. Digits only."),
+            Param("rotation_hours", "Hours a lead waits. Digits only."),
+            Param("rotation_minutes", "Minutes a lead waits. Digits only."),
+            Param("rotations", "How many times a lead may rotate."),
+            Param("buffer_minutes", "Optional buffer in minutes between rotations."),
+        ],
+        steps=[
+            {
+                "type": "select",
+                "target": "assignment.team",
+                "value": "{{team}}",
+                "optional": True,
+                "say": "Select Team - who the leads go to",
+            },
+            {
+                "type": "fill",
+                "target": "rotation.team-name",
+                "value": "{{team_name}}",
+                "optional": True,
+                "say": "Team Name - what this rotation is called",
+            },
+            {
+                "type": "select",
+                "target": "rotation.team-leader",
+                "value": "{{team_leader}}",
+                "optional": True,
+                "say": "Team Leader - {{team_leader}}",
+            },
+            {
+                "type": "fill",
+                "target": "rotation.shift-from",
+                "value": "{{shift_from}}",
+                "optional": True,
+                "say": "Shift starts at {{shift_from}}",
+            },
+            {
+                "type": "fill",
+                "target": "rotation.shift-to",
+                "value": "{{shift_to}}",
+                "optional": True,
+                "say": "Shift ends at {{shift_to}}",
+            },
+            {
+                "type": "fill",
+                "target": "rotation.days",
+                "value": "{{rotation_days}}",
+                "optional": True,
+                "say": "Rotation time - {{rotation_days}} days",
+            },
+            {
+                "type": "fill",
+                "target": "rotation.hours",
+                "value": "{{rotation_hours}}",
+                "optional": True,
+                "say": "Rotation time - {{rotation_hours}} hours",
+            },
+            {
+                "type": "fill",
+                "target": "rotation.minutes",
+                "value": "{{rotation_minutes}}",
+                "optional": True,
+                "say": "Rotation time - {{rotation_minutes}} minutes",
+            },
+            {
+                "type": "select",
+                "target": "rotation.count",
+                "value": "{{rotations}}",
+                "optional": True,
+                "say": "Number of Rotation - how many times a lead may move",
+            },
+            {
+                "type": "fill",
+                "target": "rotation.buffer",
+                "value": "{{buffer_minutes}}",
+                "optional": True,
+                "say": "Buffer time, optional - {{buffer_minutes}} minutes",
+            },
+            {
+                "type": "readState",
+                "key": "rotation_form",
+                "say": "Checking the rotation settings",
+            },
+        ],
+    ),
+    Action(
+        name="save_lead_rotation",
+        description=(
+            "Save the assignment and rotation settings on screen. This writes "
+            "to the CRM and starts leads rotating, so the user confirms first. "
+            "Call it once fill_lead_rotation reports nothing missing."
+        ),
+        params=[],
+        writes_to_crm=True,
+        steps=[
+            {
+                "type": "confirm",
+                "message": "Save this rotation? Leads from this portal will start rotating.",
+                "say": "Asking you to confirm",
+            },
+            {
+                "type": "click",
+                "target": "assignment.save",
+                "say": "Save, bottom right of the sheet",
+            },
+            {
+                "type": "readState",
+                "key": "rotation_form",
+                "say": "Checking the result",
+            },
         ],
     ),
     Action(
