@@ -129,7 +129,11 @@ ACTIONS: list[Action] = [
         ),
         params=[],
         steps=[
-            {"type": "navigate", "to": "new-lead", "say": "Opening the new lead form"},
+            # Through the button on the leads page rather than straight to the
+            # form's route: the user is being shown where Add Lead is, and a
+            # page that simply appears teaches them nothing.
+            {"type": "navigate", "to": "leads", "say": "Opening the leads page"},
+            {"type": "click", "target": "leads.add-lead", "say": "Clicking Add Lead"},
             {"type": "waitFor", "target": "lead-form.name", "say": "Waiting for the form"},
             {"type": "readState", "key": "lead_form", "say": "Checking what the form needs"},
         ],
