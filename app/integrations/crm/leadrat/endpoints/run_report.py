@@ -9,6 +9,7 @@ is passed in and the tenant setting picks between them.
 
 from typing import Any
 
+from app.core.clock import to_utc_instant
 from app.core.logging import get_logger
 from app.integrations.crm.leadrat.http import LeadratHttp
 from app.schemas.report import ReportFilters, ReportPage
@@ -39,11 +40,12 @@ def build_body(filters: ReportFilters) -> dict[str, Any]:
         body["reportPermission"] = filters.report_permission
 
     if filters.dates:
+        # Same wire shape, and the same time-zone rule, as lead search.
         body["dates"] = [
             {
                 "multiDateType": d.date_type,
-                "multiFromDate": d.from_date,
-                "multiToDate": d.to_date,
+                "multiFromDate": to_utc_instant(d.from_date),
+                "multiToDate": to_utc_instant(d.to_date),
             }
             for d in filters.dates
         ]
