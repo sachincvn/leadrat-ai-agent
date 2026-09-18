@@ -15,6 +15,7 @@ from app.agent.prompts import (
     SELECTED_LEAD_SUFFIX,
     SYSTEM_PROMPT,
     TODAY_SUFFIX,
+    VOICE_SYSTEM_PROMPT,
 )
 from app.agent.sanitize import strip_internal_ids
 from app.agent.scoping import scope_to_caller
@@ -36,6 +37,9 @@ class AgentResult:
         # gets these back so a follow-up ("the second one", "call him") can
         # resolve against the real records instead of only the prose answer.
         self.tool_notes = tool_notes or []
+        # Same meaning as `answer`, compressed for a client that plays the
+        # reply back as audio rather than displaying it.
+        self.voice_message = to_voice_message(answer)
 
 
 # Some local models (notably smaller ones served through Ollama) occasionally
@@ -73,6 +77,46 @@ def strip_thinking(content: str) -> str:
     text = _THINK_BLOCK_RE.sub("", content or "")
     text = _UNCLOSED_THINK_RE.sub("", text)
     return text.strip()
+
+
+# A bullet dash/number, and markdown emphasis markers - a TTS engine reads
+# these characters aloud literally rather than rendering them, so a voice
+# line has to be plain text even where the on-screen answer isn't.
+_LIST_MARKER_RE = re.compile(r"^[ \t]*(?:[-*•]|\d+[.)])[ \t]+", re.MULTILINE)
+_MARKDOWN_EMPHASIS_RE = re.compile(r"\*{1,3}(.*?)\*{1,3}")
+
+# Answers at or under this length are already a short spoken line - skip the
+# extra model call and just clean the formatting off them.
+VOICE_SHORT_ENOUGH_CHARS = 140
+
+
+def _plain_spoken_text(text: str) -> str:
+    text = _LIST_MARKER_RE.sub("", text)
+    text = _MARKDOWN_EMPHASIS_RE.sub(r"\1", text)
+    return re.sub(r"\s*\n+\s*", " ", text).strip()
+
+
+def to_voice_message(answer: str) -> str:
+    """The same information as `answer`, compressed to one or two short
+    spoken sentences - only the single most important point, no formatting,
+    no ids. A second, cheap call rather than asking the main agent for both
+    forms at once, since most of its steps are tool calls, not an answer to
+    compress, and forcing dual output onto every step would complicate that
+    loop for no benefit - this only ever runs once, on the finished answer.
+    """
+    cleaned = _plain_spoken_text(answer)
+    if not cleaned or len(cleaned) <= VOICE_SHORT_ENOUGH_CHARS:
+        return cleaned
+
+    try:
+        reply = get_llm().invoke([SystemMessage(VOICE_SYSTEM_PROMPT), HumanMessage(cleaned)])
+    except Exception:  # noqa: BLE001 - voice text is an enrichment, never worth failing the turn over
+        log.warning("Voice-message compression failed; falling back to a trimmed answer")
+        return cleaned[:VOICE_SHORT_ENOUGH_CHARS].rsplit(" ", 1)[0] + "..."
+
+    raw = reply.content if isinstance(reply.content, str) else str(reply.content)
+    voice = _plain_spoken_text(strip_internal_ids(strip_thinking(raw)))
+    return voice or cleaned
 
 
 _UNUSABLE_REPLY_MESSAGE = "I couldn't process that properly"
@@ -273,7 +317,11 @@ def stream_agent(
             answer = partial + "\n\n" + notice if partial else notice
             yield StreamEvent("text", text=notice)
             yield StreamEvent(
-                "done", answer=answer, tools_used=tools_used, tool_notes=tool_notes
+                "done",
+                answer=answer,
+                voice_message=to_voice_message(answer),
+                tools_used=tools_used,
+                tool_notes=tool_notes,
             )
             return
 
@@ -290,7 +338,13 @@ def stream_agent(
                 answer = _UNUSABLE_REPLY_MESSAGE
                 yield StreamEvent("text", text=answer)
 
-            yield StreamEvent("done", answer=answer, tools_used=tools_used, tool_notes=tool_notes)
+            yield StreamEvent(
+                "done",
+                answer=answer,
+                voice_message=to_voice_message(answer),
+                tools_used=tools_used,
+                tool_notes=tool_notes,
+            )
             return
 
         # A tool-calling step: nothing shown so far belongs in the answer.
@@ -311,4 +365,10 @@ def stream_agent(
 
     answer = _incomplete_answer(failures)
     yield StreamEvent("text", text=answer)
-    yield StreamEvent("done", answer=answer, tools_used=tools_used, tool_notes=tool_notes)
+    yield StreamEvent(
+        "done",
+        answer=answer,
+        voice_message=to_voice_message(answer),
+        tools_used=tools_used,
+        tool_notes=tool_notes,
+    )

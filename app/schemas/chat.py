@@ -24,6 +24,9 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
+    # Same information as `answer`, compressed to a short spoken line for a
+    # client that plays the reply back as audio instead of displaying it.
+    voice_message: str = ""
     tools_used: list[str] = []
 
 

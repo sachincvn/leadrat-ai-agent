@@ -4,9 +4,29 @@ import base64
 import json
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from ui import api_client
 from ui.config import BASE
+
+
+def speak(text: str) -> None:
+    """Read `text` aloud in the browser via the Web Speech API.
+
+    No server-side TTS involved - the browser's own speechSynthesis does the
+    work, free and with zero added latency. `st.components.v1.html` embeds
+    the snippet in an iframe on this rerun only, so it fires once per call
+    rather than replaying on every unrelated rerun.
+    """
+    components.html(
+        f"""
+        <script>
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance({json.dumps(text)}));
+        </script>
+        """,
+        height=0,
+    )
 
 st.set_page_config(page_title="MUSO AI", page_icon="💬")
 st.title("MUSO AI - CRM Assistant")
@@ -41,6 +61,13 @@ with st.sidebar:
         help="Sent as the 'tenant' header. Pre-filled from the token's custom:tenant_id claim.",
     ).strip()
 
+    auto_speak = st.checkbox(
+        "🔊 Auto-speak replies",
+        value=st.session_state.get("auto_speak", False),
+        help="Read voice_message aloud in the browser as soon as a reply finishes.",
+    )
+    st.session_state["auto_speak"] = auto_speak
+
     if jwt and st.button("Test CRM connection"):
         try:
             page = api_client.search_leads(jwt, tenant, limit=3)
@@ -66,11 +93,13 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-for msg in st.session_state.messages:
+for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
         if msg.get("tools_used"):
             st.caption("tools: " + ", ".join(msg["tools_used"]))
+        if msg.get("voice_message") and st.button("🔊 Play", key=f"play_{i}"):
+            speak(msg["voice_message"])
 
 if prompt := st.chat_input("Ask about your leads..."):
     if not jwt:
@@ -88,6 +117,7 @@ if prompt := st.chat_input("Ask about your leads..."):
 
         answer = ""
         tools_used: list[str] = []
+        voice_message = ""
         try:
             for event in api_client.chat_stream(prompt, jwt=jwt, tenant=tenant):
                 kind = event.get("type")
@@ -100,6 +130,7 @@ if prompt := st.chat_input("Ask about your leads..."):
                     body.markdown(answer)
                 elif kind == "done":
                     tools_used = event.get("tools_used", [])
+                    voice_message = event.get("voice_message", "")
                 elif kind == "error":
                     answer = event["message"]
                     body.markdown(answer)
@@ -110,7 +141,17 @@ if prompt := st.chat_input("Ask about your leads..."):
         status.empty()
         if tools_used:
             st.caption("tools: " + ", ".join(tools_used))
+        if voice_message:
+            if auto_speak:
+                speak(voice_message)
+            elif st.button("🔊 Play", key=f"play_{len(st.session_state.messages)}"):
+                speak(voice_message)
 
     st.session_state.messages.append(
-        {"role": "assistant", "content": answer, "tools_used": tools_used}
+        {
+            "role": "assistant",
+            "content": answer,
+            "tools_used": tools_used,
+            "voice_message": voice_message,
+        }
     )
