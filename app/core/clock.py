@@ -83,13 +83,19 @@ def resolve_range(value: str) -> tuple[str, str] | None:
     return (span[0].isoformat(), span[1].isoformat()) if span else None
 
 
-def to_utc_instant(value: str | None) -> str | None:
+def to_utc_instant(value: str | None, end_of_day: bool = False) -> str | None:
     """A date the way Leadrat's "dates" array wants it.
 
     A plain date means a day in the tenant's own time zone, not in UTC, and the
     backend is given UTC instants - so "2026-06-23" is the start of that day in
     IST, which is "2026-06-22T18:30:00Z". Sending the bare date instead matches
     nothing at all, which is why every window came back empty.
+
+    `end_of_day` is what makes a single day mean a day. Both ends of a range
+    are dates, and turning both into the start of their day leaves "today to
+    today" describing one instant - a window nothing can fall inside, which is
+    why a day's worth of leads came back as none. The closing end is therefore
+    the last moment of its day, not the first.
 
     A value that already carries a time is passed through, as is anything that
     is not an ISO date: the backend validates those itself.
@@ -106,5 +112,7 @@ def to_utc_instant(value: str | None) -> str | None:
     except ValueError:
         return text
 
-    start = datetime(day.year, day.month, day.day, tzinfo=CRM_TZ)
-    return start.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    moment = datetime(day.year, day.month, day.day, tzinfo=CRM_TZ)
+    if end_of_day:
+        moment += timedelta(days=1, seconds=-1)
+    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

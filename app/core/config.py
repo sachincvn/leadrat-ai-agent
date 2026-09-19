@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
 
     # llm
-    llm_provider: str = "huggingface"  # huggingface | mistral
+    llm_provider: str = "huggingface"  # huggingface | mistral | groq
     llm_temperature: float = 0.1
     llm_max_tokens: int = 1500
     # Reasoning models (Qwen3, DeepSeek-R1, ...) spend most of their latency
@@ -35,9 +35,23 @@ class Settings(BaseSettings):
     mistral_model: str = "mistral-large-latest"
     # La Plateforme is OpenAI-compatible, so it reuses the same client.
     mistral_base_url: str = "https://api.mistral.ai/v1"
+    groq_api_key: str = ""
+    # Tool-capable and on Groq's free tier. openai/gpt-oss-20b and
+    # qwen/qwen3-32b also call tools; llama-3.1-8b-instant is faster and worse
+    # at picking arguments.
+    groq_model: str = "openai/gpt-oss-120b"
+    # gpt-oss thinks before it answers. "low" is enough here - which tool to
+    # call is decided by the prompt, not by deliberation - and the reasoning is
+    # kept out of the reply entirely rather than streamed at the user.
+    groq_reasoning_effort: str = "low"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
 
     # agent
     agent_max_steps: int = 5
+    # The guided loop needs more room than chat: a plan the browser runs comes
+    # back as another turn, so reading the screen and then acting on what it
+    # says is two steps before the model has answered anything.
+    assistant_max_steps: int = 14
 
     # crm - the caller's JWT and tenant arrive per request, never from here
     leadrat_base_url: str = "https://connect.leadrat.info/api/v1/mcp"
@@ -49,6 +63,7 @@ class Settings(BaseSettings):
         return {
             "huggingface": self.hf_model,
             "mistral": self.mistral_model,
+            "groq": self.groq_model,
         }.get(self.llm_provider, "unknown")
 
     @property

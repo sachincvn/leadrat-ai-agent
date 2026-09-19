@@ -44,6 +44,14 @@ class TranscriptEntry(BaseModel):
 
 
 class PlanStep(BaseModel):
+    """One step of a plan, as the browser receives it.
+
+    Every key a registry step can carry must exist here: pydantic drops what
+    it does not declare, silently, so a step option missing from this model
+    simply never reaches the client - it does not fail, it just stops
+    happening.
+    """
+
     type: str
     say: str = ""
     to: str | None = None
@@ -51,6 +59,8 @@ class PlanStep(BaseModel):
     value: str | None = None
     message: str | None = None
     key: str | None = None
+    # fill: press Enter afterwards, for a field that searches on submit.
+    submit: bool = False
 
 
 class PlanItem(BaseModel):

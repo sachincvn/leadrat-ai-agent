@@ -32,14 +32,33 @@ def _status_code(exc: Exception) -> int | None:
     return None
 
 
+def _body(exc: Exception) -> str:
+    """Whatever the provider said, for telling two 403s apart."""
+    for source in (getattr(exc, "body", None), getattr(exc, "message", None)):
+        if source:
+            return str(source)
+    response = getattr(exc, "response", None)
+    return str(getattr(response, "text", "") or "")
+
+
 def _cause(exc: Exception) -> str:
     """A short operator-facing label for the log line."""
     status = _status_code(exc)
+    body = _body(exc).lower()
+
     if status == 402:
         return "provider account out of credits (402)"
     if status == 429:
         return "provider rate limit (429)"
     if status in (401, 403):
+        # A 403 is usually the model, not the key: asking for one above the
+        # account's plan is refused with the same status as a bad credential,
+        # and chasing the key when the model is the problem wastes an hour.
+        if "tier" in body or "not available" in body or "subscription" in body:
+            return (
+                f"model not available on this account's plan ({status}) - "
+                "check the configured model, not the API key"
+            )
         return f"provider rejected our credentials ({status})"
     if status is not None and status >= 500:
         return f"provider server error ({status})"

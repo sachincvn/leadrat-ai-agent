@@ -27,7 +27,7 @@ JWT — see *Authentication* below.
 
 ### 1. Configure the model
 
-Two providers, switched by `LLM_PROVIDER` in `.env`. Both speak the OpenAI
+Three providers, switched by `LLM_PROVIDER` in `.env`. Both speak the OpenAI
 protocol and both are chosen for the same reason: native tool calling, so calls
 arrive as structured `tool_calls` rather than text to be parsed out of a
 completion.
@@ -46,7 +46,20 @@ answer `403 tier_not_allowed`. `LLM_DISABLE_THINKING` does not apply here:
 `chat_template_kwargs` is a vLLM/TGI extension the HF router forwards into the
 template, and Mistral rejects it.
 
-**B — Hugging Face router** (`huggingface`)
+**B — Groq** (`groq`) — open-weight models on Groq's own hardware, and by some
+distance the fastest of the three, which tells on a tool-calling turn because
+that is several model calls, not one.
+
+```
+LLM_PROVIDER=groq
+GROQ_API_KEY=gsk_...
+GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+`openai/gpt-oss-20b` and `qwen/qwen3-32b` also call tools;
+`llama-3.1-8b-instant` is faster and noticeably worse at choosing arguments.
+
+**C — Hugging Face router** (`huggingface`)
 
 ```
 LLM_PROVIDER=huggingface
@@ -59,7 +72,7 @@ and `Qwen3-32B` answer but never emit a tool call, which makes the whole agent
 useless. Known good: `Qwen/Qwen3-235B-A22B-Instruct-2507`,
 `meta-llama/Llama-3.3-70B-Instruct`.
 
-There is deliberately no fallback between the two. A second model answering on
+There is deliberately no fallback between them. A second model answering on
 the days the first is unavailable would change tool-calling behaviour without
 anyone noticing; instead the turn ends with *"MUSO is temporarily unavailable"*
 and the real cause (out of credits, rate limited, rejected key) goes to the
